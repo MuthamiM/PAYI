@@ -1,0 +1,84 @@
+<svg width="980" height="560" viewBox="0 0 980 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="screenFrame" x1="122" y1="46" x2="122" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#161C29"/>
+      <stop offset="1" stop-color="#090D14"/>
+    </linearGradient>
+    <linearGradient id="baseTop" x1="490" y1="478" x2="490" y2="526" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#313744"/>
+      <stop offset="1" stop-color="#0D121A"/>
+    </linearGradient>
+    <linearGradient id="baseBottom" x1="490" y1="526" x2="490" y2="546" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#232A36"/>
+      <stop offset="1" stop-color="#070A11"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="490" cy="544" rx="392" ry="12" fill="#7D8D94" fill-opacity="0.2"/>
+
+  <rect x="118" y="42" width="744" height="436" rx="20" fill="url(#screenFrame)"/>
+  <rect x="146" y="72" width="688" height="380" rx="10" fill="#FFFFFF"/>
+
+  <rect x="146" y="72" width="688" height="46" rx="10" fill="#F6F8FB"/>
+  <text x="168" y="101" fill="#1F2A37" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Vendor List</text>
+  <rect x="256" y="86" width="65" height="20" rx="10" fill="#E5F5EE"/>
+  <text x="272" y="100" fill="#1A9E66" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">100 users</text>
+  <text x="645" y="100" fill="#6A7280" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="600">Vendor</text>
+
+  <rect x="165" y="132" width="650" height="1" fill="#E7ECF2"/>
+  <text x="165" y="154" fill="#8A93A4" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Name</text>
+  <text x="290" y="154" fill="#8A93A4" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Status</text>
+  <text x="390" y="154" fill="#8A93A4" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Role</text>
+  <text x="560" y="154" fill="#8A93A4" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Card</text>
+
+  <g>
+    <circle cx="177" cy="182" r="10" fill="#EFC79E"/>
+    <text x="198" y="186" fill="#101928" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Olivia Nhigo</text>
+    <rect x="290" y="171" width="58" height="20" rx="10" fill="#EAF8F1"/>
+    <text x="309" y="184" fill="#18A76B" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">Active</text>
+    <text x="390" y="186" fill="#6E7684" font-family="Arial, Helvetica, sans-serif" font-size="11">Product Designer</text>
+    <text x="560" y="186" fill="#2559BD" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">VISA</text>
+  </g>
+
+  <g>
+    <circle cx="177" cy="228" r="10" fill="#DEB690"/>
+    <text x="198" y="232" fill="#101928" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Phoenix Baker</text>
+    <rect x="290" y="217" width="58" height="20" rx="10" fill="#EAF8F1"/>
+    <text x="309" y="230" fill="#18A76B" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">Active</text>
+    <text x="390" y="232" fill="#6E7684" font-family="Arial, Helvetica, sans-serif" font-size="11">Product Manager</text>
+    <text x="560" y="232" fill="#1B7C3A" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">G Pay</text>
+  </g>
+
+  <g>
+    <circle cx="177" cy="274" r="10" fill="#C7A07E"/>
+    <text x="198" y="278" fill="#101928" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Lana Steiner</text>
+    <rect x="290" y="263" width="58" height="20" rx="10" fill="#EAF8F1"/>
+    <text x="309" y="276" fill="#18A76B" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">Active</text>
+    <text x="390" y="278" fill="#6E7684" font-family="Arial, Helvetica, sans-serif" font-size="11">Frontend Developer</text>
+    <circle cx="572" cy="273" r="7" fill="#D82E2F"/>
+    <circle cx="581" cy="273" r="7" fill="#F5A623"/>
+  </g>
+
+  <g>
+    <circle cx="177" cy="320" r="10" fill="#D8B18B"/>
+    <text x="198" y="324" fill="#101928" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Demi Wilkinson</text>
+    <rect x="290" y="309" width="58" height="20" rx="10" fill="#EAF8F1"/>
+    <text x="309" y="322" fill="#18A76B" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">Active</text>
+    <text x="390" y="324" fill="#6E7684" font-family="Arial, Helvetica, sans-serif" font-size="11">Backend Developer</text>
+    <text x="560" y="324" fill="#2559BD" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">VISA</text>
+  </g>
+
+  <g>
+    <circle cx="177" cy="366" r="10" fill="#E4C09D"/>
+    <text x="198" y="370" fill="#101928" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">Candice Wu</text>
+    <rect x="290" y="355" width="58" height="20" rx="10" fill="#EAF8F1"/>
+    <text x="309" y="368" fill="#18A76B" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700">Active</text>
+    <text x="390" y="370" fill="#6E7684" font-family="Arial, Helvetica, sans-serif" font-size="11">Fullstack Developer</text>
+    <circle cx="572" cy="365" r="7" fill="#D82E2F"/>
+    <circle cx="581" cy="365" r="7" fill="#F5A623"/>
+  </g>
+
+  <rect x="82" y="478" width="816" height="48" rx="24" fill="url(#baseTop)"/>
+  <rect x="56" y="526" width="868" height="20" rx="10" fill="url(#baseBottom)"/>
+  <rect x="430" y="482" width="120" height="18" rx="9" fill="#1B2230"/>
+</svg>

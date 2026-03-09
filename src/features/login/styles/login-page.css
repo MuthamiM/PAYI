@@ -1,0 +1,137 @@
+.login-layout {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 430px;
+  min-height: 215px;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  border-radius: 10px;
+  background: var(--card-bg);
+  box-shadow: 0 5px 14px rgba(79, 76, 86, 0.2);
+  padding: 12px;
+  gap: 14px;
+}
+
+.welcome-panel {
+  background: linear-gradient(160deg, #a72ea3 0%, #7e237d 100%);
+  color: #f7f5f7;
+  border-radius: 10px;
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.welcome-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+
+.welcome-copy {
+  margin: 9px 0 16px;
+  font-size: 9.2px;
+  line-height: 1.35;
+  max-width: 112px;
+  opacity: 0.88;
+}
+
+.welcome-action {
+  border: 1px solid #e7d7e8;
+  color: #f8f6f8;
+  background: transparent;
+  border-radius: 14px;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.signin-panel {
+  background: #f7f7f8;
+  border-radius: 8px;
+  padding: 6px 8px 4px;
+}
+
+.signin-title {
+  margin: 2px 0 18px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #66626b;
+}
+
+.signin-form {
+  display: grid;
+  gap: 12px;
+}
+
+.input-group {
+  display: grid;
+  gap: 3px;
+}
+
+.input-label {
+  font-size: 8px;
+  color: #a7a2aa;
+  letter-spacing: 0.3px;
+}
+
+.input-field {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #d5d0d8;
+  padding: 2px 0 4px;
+  background: transparent;
+  font-size: 10px;
+  color: #5d5964;
+  outline: none;
+}
+
+.input-field:focus {
+  border-bottom-color: #a535a1;
+}
+
+.signin-action {
+  justify-self: center;
+  margin-top: 4px;
+  border: none;
+  background: linear-gradient(165deg, #a72ea3 0%, #7d227c 100%);
+  color: #ffffff;
+  border-radius: 2px;
+  font-size: 8px;
+  letter-spacing: 0.7px;
+  font-weight: 600;
+  padding: 5px 16px;
+  min-width: 54px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(122, 32, 122, 0.35);
+}
+
+.signin-message {
+  margin: 0;
+  min-height: 11px;
+  text-align: center;
+  font-size: 8px;
+  color: #7f7888;
+}
+
+@media (max-width: 520px) {
+  .login-card {
+    width: min(100%, 360px);
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .welcome-panel {
+    min-height: 150px;
+  }
+}

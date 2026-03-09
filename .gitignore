@@ -1,0 +1,24 @@
+# Runtime and build artifacts
+**/bin/
+**/obj/
+*.log
+*.tmp
+*.temp
+
+# Local app data and user-specific test data
+backend/Payi.Api/Data/
+
+# Environment and secret files
+.env
+.env.*
+*.secrets.json
+secrets.json
+appsettings.Local.json
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

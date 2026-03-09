@@ -1,0 +1,33 @@
+:root {
+  --page-bg: #0d7f73;
+  --text-main: #0f2330;
+  --accent: #16a085;
+  --accent-dark: #0a7662;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Poppins", "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--text-main);
+  position: relative;
+  overflow-x: hidden;
+  background: radial-gradient(circle at 20% 10%, #1ea290 0%, #0f7f73 40%, #0a6d63 100%);
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+a {
+  color: inherit;
+}
