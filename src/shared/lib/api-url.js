@@ -28,3 +28,19 @@ export function toApiUrl(path) {
 export function getAppOrigin() {
   return resolveApiOrigin();
 }
+
+/**
+ * Returns Authorization headers for authenticated API requests.
+ * Awaits the Bearer token from the Clerk session if available.
+ */
+export async function authHeaders() {
+  if (typeof window === "undefined" || !window.Clerk || !window.Clerk.session) return {};
+  const token = await window.Clerk.session.getToken();
+  const userEmail = window.Clerk.user?.primaryEmailAddress?.emailAddress || '';
+
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "X-User-Email": userEmail
+  };
+}

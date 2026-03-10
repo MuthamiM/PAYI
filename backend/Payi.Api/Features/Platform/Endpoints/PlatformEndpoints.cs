@@ -50,7 +50,8 @@ public static class PlatformEndpoints
             .WithSummary("Submit business/contact request")
             .WithDescription("Stores a contact request for platform onboarding or partnership follow-up.")
             .Produces<ContactResponse>(StatusCodes.Status201Created)
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .RequireRateLimiting("GeneralRateLimit");
     }
 
     private static IResult GetOverview()
@@ -149,15 +150,27 @@ public static class PlatformEndpoints
         {
             errors["name"] = ["Name is required."];
         }
+        else if (request.Name.Length > 100)
+        {
+            errors["name"] = ["Name must be 100 characters or fewer."];
+        }
 
         if (!IsValidEmail(request.Email))
         {
             errors["email"] = ["A valid email is required."];
         }
+        else if (request.Email.Length > 254)
+        {
+            errors["email"] = ["Email must be 254 characters or fewer."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Message))
         {
             errors["message"] = ["Message is required."];
+        }
+        else if (request.Message.Length > 2000)
+        {
+            errors["message"] = ["Message must be 2000 characters or fewer."];
         }
 
         return errors;

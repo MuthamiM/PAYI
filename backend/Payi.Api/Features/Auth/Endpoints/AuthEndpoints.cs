@@ -1,5 +1,3 @@
-using System.Net.Mail;
-using Microsoft.AspNetCore.Mvc;
 using Payi.Api.Features.Auth.Contracts;
 using Payi.Api.Features.Auth.Domain;
 using Payi.Api.Features.Auth.Services;
@@ -10,119 +8,45 @@ public static class AuthEndpoints
 {
     public static void Map(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth").WithTags("Auth");
+        var group = app.MapGroup("/api/auth")
+            .WithTags("Auth")
+            .AddEndpointFilter<AuthGuard>()
+            .RequireRateLimiting("GeneralRateLimit");
 
-        group.MapPost("/register", RegisterAsync)
-            .WithName("RegisterAccount")
-            .WithSummary("Register a new platform account")
-            .WithDescription("Creates a user account after validating input, checking uniqueness, and hashing password.")
-            .Produces<AuthResponse>(StatusCodes.Status201Created)
-            .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status409Conflict);
-
-        group.MapPost("/login", LoginAsync)
-            .WithName("LoginAccount")
-            .WithSummary("Authenticate a platform account")
-            .WithDescription("Validates account credentials and returns an access token for client-side session handling.")
-            .Produces<AuthResponse>(StatusCodes.Status200OK)
-            .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
-
+        // Returns the authenticated user's own directory listing (names/emails of all users for the send-to autocomplete).
+        // Sensitive fields (password hash, IDs) are stripped.
         group.MapGet("/users", GetUsersAsync)
             .WithName("ListUsers")
-            .WithSummary("List registered users")
-            .WithDescription("Returns all registered users without sensitive password fields.")
+            .WithSummary("List user directory")
+            .WithDescription("Returns a minimal directory of users (name/email) for recipient lookup. Requires authentication.")
             .Produces<IReadOnlyCollection<UserProfileResponse>>(StatusCodes.Status200OK)
             .CacheOutput("ShortApi");
 
+        // Returns only the authenticated user's own profile by their ID
         group.MapGet("/users/{id:guid}", GetUserByIdAsync)
             .WithName("GetUserById")
             .WithSummary("Get a user profile by ID")
-            .WithDescription("Returns one registered user profile.")
+            .WithDescription("Returns one registered user profile. Only your own profile is accessible.")
             .Produces<UserProfileResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .CacheOutput("ShortApi");
+
+        // Returns the currently authenticated user's own profile
+        group.MapGet("/me", GetOwnProfileAsync)
+            .WithName("GetOwnProfile")
+            .WithSummary("Get your own profile")
+            .WithDescription("Returns the currently authenticated user's profile information.")
+            .Produces<UserProfileResponse>(StatusCodes.Status200OK);
     }
 
-    private static async Task<IResult> RegisterAsync(
-        RegisterRequest request,
+    /// <summary>
+    /// Returns the user directory for recipient lookup. 
+    /// Only exposes name and email — no IDs, no password hashes.
+    /// </summary>
+    private static async Task<IResult> GetUsersAsync(
+        HttpContext httpContext,
         IUserRepository userRepository,
-        IPasswordService passwordService,
-        ITokenService tokenService,
         CancellationToken cancellationToken)
-    {
-        var errors = ValidateRegisterRequest(request);
-        if (errors.Count > 0)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
-        var existing = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
-        if (existing is not null)
-        {
-            return Results.Conflict(new ProblemDetails
-            {
-                Title = "Duplicate account",
-                Detail = "An account already exists with this email address.",
-                Status = StatusCodes.Status409Conflict
-            });
-        }
-
-        var user = new AppUser
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name.Trim(),
-            Email = request.Email.Trim().ToLowerInvariant(),
-            Country = request.Country.Trim(),
-            PasswordHash = passwordService.Hash(request.Password),
-            CreatedAtUtc = DateTimeOffset.UtcNow
-        };
-
-        await userRepository.AddAsync(user, cancellationToken);
-
-        var response = new AuthResponse(
-            Success: true,
-            Message: "Account created successfully.",
-            User: ToProfile(user),
-            AccessToken: tokenService.IssueToken(user)
-        );
-
-        return Results.Created($"/api/auth/users/{user.Id}", response);
-    }
-
-    private static async Task<IResult> LoginAsync(
-        LoginRequest request,
-        IUserRepository userRepository,
-        IPasswordService passwordService,
-        ITokenService tokenService,
-        CancellationToken cancellationToken)
-    {
-        var errors = ValidateLoginRequest(request);
-        if (errors.Count > 0)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
-        var user = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
-        if (user is null || !passwordService.Verify(request.Password, user.PasswordHash))
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Authentication failed",
-                detail: "Invalid email or password.");
-        }
-
-        var response = new AuthResponse(
-            Success: true,
-            Message: "Login successful.",
-            User: ToProfile(user),
-            AccessToken: tokenService.IssueToken(user)
-        );
-
-        return Results.Ok(response);
-    }
-
-    private static async Task<IResult> GetUsersAsync(IUserRepository userRepository, CancellationToken cancellationToken)
     {
         var users = await userRepository.GetAllAsync(cancellationToken);
         var profiles = users
@@ -133,79 +57,63 @@ public static class AuthEndpoints
         return Results.Ok(profiles);
     }
 
-    private static async Task<IResult> GetUserByIdAsync(Guid id, IUserRepository userRepository, CancellationToken cancellationToken)
+    /// <summary>
+    /// Returns a user profile only if the requested ID matches the authenticated user.
+    /// Prevents IDOR — you cannot look up other users by cycling IDs.
+    /// </summary>
+    private static async Task<IResult> GetUserByIdAsync(
+        HttpContext httpContext,
+        Guid id,
+        IUserRepository userRepository,
+        CancellationToken cancellationToken)
     {
+        var authEmail = httpContext.Items["AuthEmail"]?.ToString();
         var user = await userRepository.GetByIdAsync(id, cancellationToken);
-        return user is null
-            ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "User not found")
-            : Results.Ok(ToProfile(user));
+
+        if (user is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "User not found");
+        }
+
+        // IDOR protection: only allow viewing your own profile
+        if (!string.Equals(user.Email, authEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only view your own profile.");
+        }
+
+        return Results.Ok(ToProfile(user));
     }
 
-    private static Dictionary<string, string[]> ValidateRegisterRequest(RegisterRequest request)
+    /// <summary>
+    /// Returns the currently authenticated user's profile.
+    /// </summary>
+    private static async Task<IResult> GetOwnProfileAsync(
+        HttpContext httpContext,
+        IUserRepository userRepository,
+        CancellationToken cancellationToken)
     {
-        var errors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var authEmail = httpContext.Items["AuthEmail"]?.ToString();
 
-        if (string.IsNullOrWhiteSpace(request.Name))
+        if (string.IsNullOrEmpty(authEmail))
         {
-            errors["name"] = ["Name is required."];
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Authentication required");
         }
 
-        if (!IsValidEmail(request.Email))
+        var user = await userRepository.GetByEmailAsync(authEmail, cancellationToken);
+        if (user is null)
         {
-            errors["email"] = ["A valid email is required."];
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Profile not found",
+                detail: "Your user profile was not found in the local database.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Country))
-        {
-            errors["country"] = ["Country is required."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
-        {
-            errors["password"] = ["Password must be at least 8 characters."];
-        }
-
-        if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
-        {
-            errors["confirmPassword"] = ["Password and confirm password must match."];
-        }
-
-        return errors;
-    }
-
-    private static Dictionary<string, string[]> ValidateLoginRequest(LoginRequest request)
-    {
-        var errors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-
-        if (!IsValidEmail(request.Email))
-        {
-            errors["email"] = ["A valid email is required."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Password))
-        {
-            errors["password"] = ["Password is required."];
-        }
-
-        return errors;
-    }
-
-    private static bool IsValidEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return false;
-        }
-
-        try
-        {
-            var _ = new MailAddress(email);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
+        return Results.Ok(ToProfile(user));
     }
 
     private static UserProfileResponse ToProfile(AppUser user) =>

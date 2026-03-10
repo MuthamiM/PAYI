@@ -1,4 +1,4 @@
-import { getAppOrigin, toApiUrl } from "../../../shared/lib/api-url.js";
+import { getAppOrigin, toApiUrl, authHeaders } from "../../../shared/lib/api-url.js";
 
 function getGreeting(now = new Date()) {
   const hour = now.getHours();
@@ -15,12 +15,14 @@ function getGreeting(now = new Date()) {
 }
 
 function getStoredUser() {
-  try {
-    const raw = localStorage.getItem("payi_user");
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
+  if (typeof window !== "undefined" && window.Clerk && window.Clerk.user) {
+    const user = window.Clerk.user;
+    return {
+      name: user.fullName || user.firstName || "Merchant User",
+      email: user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : "unknown@domain.com"
+    };
   }
+  return null;
 }
 
 function firstNameOf(name) {
@@ -37,9 +39,7 @@ function firstNameOf(name) {
 }
 
 function isAuthenticated() {
-  const token = localStorage.getItem("payi_access_token");
-  const user = getStoredUser();
-  return Boolean(token && user?.email);
+  return typeof window !== "undefined" && window.Clerk && window.Clerk.user !== null;
 }
 
 function setStatus(element, message, isError = false) {
@@ -61,15 +61,37 @@ async function parseResponse(response) {
   return { ok: response.ok, payload };
 }
 
-async function requestJson(url, options) {
-  const response = await fetch(toApiUrl(url), options);
-  const result = await parseResponse(response);
+// Helper to attach authorization header
+async function requestJson(url, options = {}) {
+  const token = await window.Clerk.session.getToken();
+  const userEmail = window.Clerk.user?.primaryEmailAddress?.emailAddress || '';
+  const headers = {
+    ...(options.headers || {}),
+    "Authorization": `Bearer ${token}`,
+    "X-User-Email": userEmail
+  };
 
-  if (!result.ok) {
-    throw new Error(result.payload?.detail || result.payload?.title || "Request failed.");
+  if (options.body && !(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(options.body);
   }
 
-  return result.payload;
+  const res = await fetch(toApiUrl(url), { ...options, headers });
+  // Attempt parsing as JSON; ignore body on 204 or empty
+  const text = await res.text();
+  let data = null;
+  if (text) {
+    try { data = JSON.parse(text); } catch (e) { }
+  }
+
+  if (!res.ok) {
+    throw {
+      status: res.status,
+      data: data || { detail: "An unexpected error occurred." }
+    };
+  }
+
+  return data;
 }
 
 function mapRow(row) {
@@ -869,8 +891,7 @@ function wireNotifications(root, user, refreshHistory) {
 
         setStatus(
           requestStatus,
-          `Request sent. Ref: ${response.reference} for ${formatAmount(response.amount, response.currency)} to ${
-            response.recipientEmail
+          `Request sent. Ref: ${response.reference} for ${formatAmount(response.amount, response.currency)} to ${response.recipientEmail
           }.`
         );
         requestForm.reset();
@@ -967,7 +988,7 @@ export function wireDashboardWelcome(root, page) {
 
   if (typeof loadNotifications === "function") {
     const poller = window.setInterval(() => {
-      Promise.all([refreshHistory(), loadNotifications()]).catch(() => {});
+      Promise.all([refreshHistory(), loadNotifications()]).catch(() => { });
     }, 12000);
 
     window.addEventListener(
@@ -982,7 +1003,13 @@ export function wireDashboardWelcome(root, page) {
   Promise.all(initialLoad).catch(() => {
     const historyBody = root.querySelector("[data-history-body]");
     if (historyBody) {
-      historyBody.innerHTML = "<tr><td colspan='8'>Could not load dashboard data from API.</td></tr>";
+      historyBody.textContent = "";
+      const errorRow = document.createElement("tr");
+      const errorCell = document.createElement("td");
+      errorCell.colSpan = 8;
+      errorCell.textContent = "Could not load dashboard data from API.";
+      errorRow.appendChild(errorCell);
+      historyBody.appendChild(errorRow);
     }
   });
 }

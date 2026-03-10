@@ -140,7 +140,7 @@ function createHomeMain() {
         </div>
 
         <div class="hero-laptop-wrap">
-          <img src="/src/assets/payi-laptop.svg" alt="PAYI merchant laptop dashboard preview" />
+          <img src="/src/assets/payi-laptop.svg?v=20260310dark" alt="PAYI merchant laptop dashboard preview" />
         </div>
       </section>
     </main>

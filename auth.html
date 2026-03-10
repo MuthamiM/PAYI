@@ -1,15 +1,75 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PAYI | Login and Register</title>
-    <link rel="stylesheet" href="/src/app/styles/app.css?v=20260309e" />
-    <link rel="stylesheet" href="/src/features/platform/styles/platform-page.css?v=20260309e" />
-    <link rel="stylesheet" href="/src/features/auth/styles/auth-panel.css?v=20260309e" />
-  </head>
-  <body data-page="auth">
-    <div id="app"></div>
-    <script type="module" src="/src/app/main.js?v=20260309e"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PAYI | Login and Register</title>
+  <link rel="stylesheet" href="/src/app/styles/app.css?v=20260309e" />
+  <link rel="stylesheet" href="/src/features/platform/styles/platform-page.css?v=20260309e" />
+  <link rel="stylesheet" href="/src/features/auth/styles/auth-panel.css?v=20260309e" />
+</head>
+
+<body data-page="auth">
+  <div id="app"></div>
+
+  <!-- Render layout first via main.js -->
+  <script type="module" src="/src/app/main.js?v=20260310a"></script>
+
+  <!-- Then load and mount Clerk after the layout is in the DOM -->
+  <script>
+    const publishableKey = "pk_test_cHJpbWUtcHVtYS0xOS5jbGVyay5hY2NvdW50cy5kZXYk";
+
+    let _resolveClerk;
+    window.__clerkReady = new Promise(resolve => { _resolveClerk = resolve; });
+
+    const startClerk = async () => {
+      const clerkInstance = window.Clerk;
+      try {
+        await clerkInstance.load();
+        console.log("[PAYI-INLINE] Clerk loaded, user:", clerkInstance.user);
+        _resolveClerk(clerkInstance);
+
+        // If already logged in, redirect to dashboard
+        if (clerkInstance.user) {
+          window.location.href = "/dashboard.html";
+          return;
+        }
+
+        // Wait a tick for main.js to render the layout and create #sign-in
+        const waitForElement = async (selector, maxWait = 5000) => {
+          const start = Date.now();
+          while (!document.querySelector(selector) && Date.now() - start < maxWait) {
+            await new Promise(r => setTimeout(r, 50));
+          }
+          return document.querySelector(selector);
+        };
+
+        const mountTarget = await waitForElement("#sign-in");
+        if (mountTarget) {
+          console.log("[PAYI-INLINE] Mounting SignIn to:", mountTarget);
+          clerkInstance.mountSignIn(mountTarget, {
+            afterSignInUrl: "/dashboard.html",
+            afterSignUpUrl: "/dashboard.html"
+          });
+        } else {
+          console.error("[PAYI-INLINE] #sign-in element not found!");
+        }
+      } catch (err) {
+        console.error("Error starting Clerk:", err);
+        _resolveClerk(null);
+      }
+    };
+
+    const clerkScript = document.createElement("script");
+    clerkScript.setAttribute("data-clerk-publishable-key", publishableKey);
+    clerkScript.async = true;
+    clerkScript.src = "https://prime-puma-19.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+    clerkScript.crossOrigin = "anonymous";
+    clerkScript.addEventListener("load", startClerk);
+    clerkScript.addEventListener("error", () => { _resolveClerk(null); });
+    document.body.appendChild(clerkScript);
+  </script>
+</body>
+
 </html>

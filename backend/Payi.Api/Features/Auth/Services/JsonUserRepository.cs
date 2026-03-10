@@ -33,6 +33,13 @@ public sealed class JsonUserRepository : IUserRepository
         return users.FirstOrDefault(user => user.Id == id);
     }
 
+    public async Task<AppUser?> GetByClerkIdAsync(string clerkId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(clerkId)) return null;
+        var users = await ReadAllInternalAsync(cancellationToken);
+        return users.FirstOrDefault(user => string.Equals(user.ClerkId, clerkId, StringComparison.OrdinalIgnoreCase));
+    }
+
     public async Task<IReadOnlyCollection<AppUser>> GetAllAsync(CancellationToken cancellationToken)
     {
         return await ReadAllInternalAsync(cancellationToken);
@@ -48,6 +55,26 @@ public sealed class JsonUserRepository : IUserRepository
             users.Add(user);
             await WriteAllNoLockAsync(users, cancellationToken);
             return user;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task UpdateAsync(AppUser user, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var users = await ReadAllNoLockAsync(cancellationToken);
+            var index = users.FindIndex(u => u.Id == user.Id);
+            if (index >= 0)
+            {
+                users[index] = user;
+                await WriteAllNoLockAsync(users, cancellationToken);
+            }
         }
         finally
         {

@@ -1,4 +1,4 @@
-import { toApiUrl } from "../../../shared/lib/api-url.js";
+import { toApiUrl, authHeaders } from "../../../shared/lib/api-url.js";
 
 function setPayoutResult(root, text, isError = false) {
   const result = root.querySelector("[data-payout-result]");
@@ -33,7 +33,8 @@ export function wirePlatformInteractions(root) {
 
     try {
       const response = await fetch(
-        toApiUrl(`/api/platform/payout-options?country=${encodeURIComponent(selectedCountry)}`)
+        toApiUrl(`/api/platform/payout-options?country=${encodeURIComponent(selectedCountry)}`),
+        { headers: await authHeaders() }
       );
       const payload = await response.json();
 

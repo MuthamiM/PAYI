@@ -1,15 +1,46 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PAYI | Dashboard</title>
-    <link rel="stylesheet" href="/src/app/styles/app.css?v=20260309e" />
-    <link rel="stylesheet" href="/src/features/platform/styles/platform-page.css?v=20260309e" />
-    <link rel="stylesheet" href="/src/features/auth/styles/auth-panel.css?v=20260309e" />
-  </head>
-  <body data-page="dashboard">
-    <div id="app"></div>
-    <script type="module" src="/src/app/main.js?v=20260309e"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PAYI | Dashboard</title>
+  <link rel="stylesheet" href="/src/app/styles/app.css?v=20260309e" />
+  <link rel="stylesheet" href="/src/features/platform/styles/platform-page.css?v=20260309e" />
+  <link rel="stylesheet" href="/src/features/auth/styles/auth-panel.css?v=20260309e" />
+</head>
+
+<body data-page="dashboard">
+  <div id="app"></div>
+  <script>
+    const publishableKey = "pk_test_cHJpbWUtcHVtYS0xOS5jbGVyay5hY2NvdW50cy5kZXYk";
+
+    let _resolveClerk;
+    window.__clerkReady = new Promise(resolve => { _resolveClerk = resolve; });
+
+    const startClerk = async () => {
+      const Clerk = window.Clerk;
+      try {
+        await Clerk.load();
+        _resolveClerk(Clerk);
+      } catch (err) {
+        console.error("Error starting Clerk: ", err);
+        _resolveClerk(null);
+      }
+    };
+
+    const script = document.createElement("script");
+    script.setAttribute("data-clerk-publishable-key", publishableKey);
+    script.async = true;
+    script.src = "https://prime-puma-19.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+    script.crossOrigin = "anonymous";
+    script.addEventListener("load", startClerk);
+    script.addEventListener("error", () => {
+      _resolveClerk(null);
+    });
+    document.body.appendChild(script);
+  </script>
+  <script type="module" src="/src/app/main.js?v=20260309e"></script>
+</body>
+
 </html>

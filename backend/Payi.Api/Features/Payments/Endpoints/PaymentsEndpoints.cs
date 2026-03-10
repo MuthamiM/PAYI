@@ -1,19 +1,32 @@
 using System.Net.Mail;
 using System.Globalization;
+using System.Security.Cryptography;
 using Payi.Api.Features.Auth.Domain;
 using Payi.Api.Features.Auth.Services;
 using Payi.Api.Features.Payments.Contracts;
 using Payi.Api.Features.Payments.Domain;
 using Payi.Api.Features.Payments.Services;
+using Payi.Api.Features.System.Services;
 using QRCoder;
 
 namespace Payi.Api.Features.Payments.Endpoints;
 
 public static class PaymentsEndpoints
 {
+    private const decimal MaxTransferAmount = 1_000_000m;
+    private const int MaxNameLength = 200;
+    private const int MaxAccountLength = 254;
+    private const int MaxCountryLength = 100;
+    private const int MaxCurrencyLength = 3;
+    private const int MaxNoteLength = 500;
+
     public static void Map(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/payments").WithTags("Payments");
+        var group = app.MapGroup("/api/payments")
+            .WithTags("Payments")
+            .AddEndpointFilter<AuthGuard>()
+            .AddEndpointFilter<IdempotencyGuard>()
+            .RequireRateLimiting("PaymentRateLimit");
 
         group.MapGet("/transactions", GetTransactionsAsync)
             .WithName("GetTransactions")
@@ -97,16 +110,37 @@ public static class PaymentsEndpoints
         group.MapPost("/wallet/topup", TopUpWalletAsync)
             .WithName("TopUpWallet")
             .WithSummary("Top up wallet balance")
-            .WithDescription("Credits wallet balance for testing or controlled admin operations.")
+            .WithDescription("Credits wallet balance. Requires authentication.")
             .Produces<WalletBalanceResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem();
     }
 
+    /// <summary>
+    /// Extracts the authenticated user's email from the AuthGuard-injected context.
+    /// Returns null if HttpContext is missing (should not happen behind AuthGuard).
+    /// </summary>
+    private static string? GetAuthEmail(HttpContext context)
+    {
+        return context.Items.TryGetValue("AuthEmail", out var email) ? email as string : null;
+    }
+
     private static async Task<IResult> GetTransactionsAsync(
+        HttpContext httpContext,
         string userEmail,
         ITransactionRepository repository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(userEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only view your own transactions.");
+        }
+
         if (!IsValidEmail(userEmail))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -115,25 +149,37 @@ public static class PaymentsEndpoints
             });
         }
 
-        var records = await repository.GetByUserEmailAsync(userEmail, cancellationToken);
+        var records = await repository.GetByUserEmailAsync(targetEmail, cancellationToken);
         var response = records.Select(ToResponse).ToArray();
         return Results.Ok(response);
     }
 
     private static async Task<IResult> SendAsync(
+        HttpContext httpContext,
         SendPaymentRequest request,
         ITransactionRepository repository,
         IWalletRepository walletRepository,
         IUserRepository userRepository,
+        IAuditLogger auditLogger,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var senderEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, senderEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only send payments from your own account.");
+        }
+
         var errors = ValidateSend(request);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
-        var senderEmail = request.UserEmail.Trim().ToLowerInvariant();
         var recipientAccount = request.RecipientAccount.Trim();
         var recipientUser = await ResolveRecipientAsync(
             recipientAccount,
@@ -197,6 +243,16 @@ public static class PaymentsEndpoints
             responseMessage = $"Payment completed via {method}. Recipient wallet credited.";
         }
 
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+        await auditLogger.LogAsync(new AuditEntry
+        {
+            Event = "Payment.Send",
+            Actor = senderEmail,
+            Target = tx.Reference,
+            Detail = $"Sent {request.Amount:0.00} {currency} to {request.RecipientAccount.Trim()}.",
+            IpAddress = clientIp
+        }, cancellationToken);
+
         var response = new PaymentActionResponse(
             true,
             responseMessage,
@@ -247,11 +303,23 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> ReceiveAsync(
+        HttpContext httpContext,
         ReceivePaymentRequest request,
         ITransactionRepository repository,
         IWalletRepository walletRepository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only record receives for your own account.");
+        }
+
         var errors = ValidateReceive(request);
         if (errors.Count > 0)
         {
@@ -260,7 +328,7 @@ public static class PaymentsEndpoints
 
         var currency = request.Currency.Trim().ToUpperInvariant();
         var credit = await walletRepository.CreditAsync(
-            request.UserEmail.Trim().ToLowerInvariant(),
+            targetEmail,
             currency,
             request.Amount,
             cancellationToken);
@@ -268,7 +336,7 @@ public static class PaymentsEndpoints
         var tx = new PaymentTransaction
         {
             Reference = BuildReference("RCV"),
-            UserEmail = request.UserEmail.Trim().ToLowerInvariant(),
+            UserEmail = targetEmail,
             Direction = "Receive",
             CounterpartyName = request.SenderName.Trim(),
             Country = request.SourceCountry.Trim(),
@@ -293,19 +361,30 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> CreateRequestAsync(
+        HttpContext httpContext,
         CreatePaymentRequestRequest request,
         IPaymentRequestRepository requestRepository,
         IUserRepository userRepository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var requesterEmail = NormalizeEmail(request.RequesterEmail);
+
+        if (!string.Equals(authEmail, requesterEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only create payment requests from your own account.");
+        }
+
         var errors = ValidateCreateRequest(request);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
-        var requesterEmail = request.RequesterEmail.Trim().ToLowerInvariant();
-        var recipientEmail = request.RecipientEmail.Trim().ToLowerInvariant();
+        var recipientEmail = NormalizeEmail(request.RecipientEmail);
 
         var requester = await userRepository.GetByEmailAsync(requesterEmail, cancellationToken);
         if (requester is null)
@@ -347,11 +426,23 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> GetNotificationsAsync(
+        HttpContext httpContext,
         string userEmail,
         IPaymentRequestRepository requestRepository,
         ITransactionRepository transactionRepository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var normalizedEmail = NormalizeEmail(userEmail);
+
+        if (!string.Equals(authEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only view your own notifications.");
+        }
+
         if (!IsValidEmail(userEmail))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -360,7 +451,6 @@ public static class PaymentsEndpoints
             });
         }
 
-        var normalizedEmail = userEmail.Trim().ToLowerInvariant();
         var requests = await requestRepository.GetByRecipientEmailAsync(normalizedEmail, cancellationToken);
         var incomingRequests = requests
             .Where(item => string.Equals(item.Status, "Pending", StringComparison.OrdinalIgnoreCase))
@@ -381,14 +471,27 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> ApproveRequestAsync(
+        HttpContext httpContext,
         Guid id,
         ApprovePaymentRequestRequest request,
         IPaymentRequestRepository requestRepository,
         ITransactionRepository transactionRepository,
         IWalletRepository walletRepository,
         IUserRepository userRepository,
+        IAuditLogger auditLogger,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var approverEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, approverEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only approve requests as your own account.");
+        }
+
         var errors = ValidateApproveRequest(request);
         if (errors.Count > 0)
         {
@@ -412,7 +515,6 @@ public static class PaymentsEndpoints
                 detail: $"This request is already {paymentRequest.Status.ToLowerInvariant()}.");
         }
 
-        var approverEmail = request.UserEmail.Trim().ToLowerInvariant();
         if (!string.Equals(paymentRequest.RecipientEmail, approverEmail, StringComparison.OrdinalIgnoreCase))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -488,6 +590,16 @@ public static class PaymentsEndpoints
         paymentRequest.SettlementReference = payerTx.Reference;
         await requestRepository.UpdateAsync(paymentRequest, cancellationToken);
 
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+        await auditLogger.LogAsync(new AuditEntry
+        {
+            Event = "PaymentRequest.Approve",
+            Actor = approverEmail,
+            Target = paymentRequest.Id.ToString(),
+            Detail = $"Approved request for {paymentRequest.Amount:0.00} {paymentRequest.Currency} from {paymentRequest.RequesterEmail}.",
+            IpAddress = clientIp
+        }, cancellationToken);
+
         var response = new PaymentActionResponse(
             true,
             "Payment request approved and settled.",
@@ -506,10 +618,22 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> CreateQrAsync(
+        HttpContext httpContext,
         QrPaymentRequest request,
         ITransactionRepository repository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only create QR requests for your own account.");
+        }
+
         var errors = ValidateQr(request);
         if (errors.Count > 0)
         {
@@ -520,7 +644,7 @@ public static class PaymentsEndpoints
         var tx = new PaymentTransaction
         {
             Reference = reference,
-            UserEmail = request.UserEmail.Trim().ToLowerInvariant(),
+            UserEmail = targetEmail,
             Direction = "Receive",
             CounterpartyName = request.Purpose.Trim(),
             Country = request.Country.Trim(),
@@ -574,11 +698,23 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> PayQrAsync(
+        HttpContext httpContext,
         QrPayRequest request,
         ITransactionRepository transactionRepository,
         IWalletRepository walletRepository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only pay from your own account.");
+        }
+
         var errors = ValidateQrPay(request);
         if (errors.Count > 0)
         {
@@ -594,7 +730,7 @@ public static class PaymentsEndpoints
         }
 
         var debit = await walletRepository.DebitAsync(
-            request.UserEmail.Trim().ToLowerInvariant(),
+            targetEmail,
             qrData.Currency,
             qrData.Amount,
             cancellationToken);
@@ -610,7 +746,7 @@ public static class PaymentsEndpoints
         var tx = new PaymentTransaction
         {
             Reference = BuildReference("QRPAY"),
-            UserEmail = request.UserEmail.Trim().ToLowerInvariant(),
+            UserEmail = targetEmail,
             Direction = "Send",
             CounterpartyName = $"QR {qrData.Reference}",
             Country = qrData.Country,
@@ -635,10 +771,22 @@ public static class PaymentsEndpoints
     }
 
     private static async Task<IResult> GetWalletAsync(
+        HttpContext httpContext,
         string userEmail,
         IWalletRepository walletRepository,
         CancellationToken cancellationToken)
     {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(userEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only view your own wallet.");
+        }
+
         if (!IsValidEmail(userEmail))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -647,32 +795,83 @@ public static class PaymentsEndpoints
             });
         }
 
-        var wallet = await walletRepository.GetOrCreateAsync(userEmail.Trim().ToLowerInvariant(), cancellationToken);
+        var wallet = await walletRepository.GetOrCreateAsync(targetEmail, cancellationToken);
         var response = new WalletBalanceResponse(wallet.UserEmail, wallet.Balances, wallet.UpdatedAtUtc);
         return Results.Ok(response);
     }
 
     private static async Task<IResult> TopUpWalletAsync(
+        HttpContext httpContext,
         WalletTopUpRequest request,
         IWalletRepository walletRepository,
+        ITransactionRepository transactionRepository,
+        IConfiguration config,
         CancellationToken cancellationToken)
     {
-        var errors = ValidateTopUp(request);
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "You can only top up your own wallet.");
+        }
+
+        var maxTopUpPerTx = config.GetValue<decimal>("Security:MaxTopUpPerTransaction", 10000m);
+        var errors = ValidateTopUp(request, maxTopUpPerTx);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
+        var maxTopUpPerDay = config.GetValue<decimal>("Security:MaxTopUpPerDay", 50000m);
+        
+        // Calculate daily top-up total
+        var transactions = await transactionRepository.GetByUserEmailAsync(targetEmail, cancellationToken);
+        var today = DateTimeOffset.UtcNow.Date;
+        var dailyTopUpSum = transactions
+            .Where(t => string.Equals(t.Method, "Top-Up", StringComparison.OrdinalIgnoreCase) && 
+                        t.CreatedAtUtc.Date == today)
+            .Sum(t => t.Amount);
+
+        if (dailyTopUpSum + request.Amount > maxTopUpPerDay)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: "Daily Limit Exceeded",
+                detail: $"This top-up exceeds your daily limit of {maxTopUpPerDay:N0} {request.Currency}. Remaining allowance: {Math.Max(0, maxTopUpPerDay - dailyTopUpSum):N0}.");
+        }
+
         await walletRepository.CreditAsync(
-            request.UserEmail.Trim().ToLowerInvariant(),
+            targetEmail,
             request.Currency.Trim().ToUpperInvariant(),
             request.Amount,
             cancellationToken);
 
-        var wallet = await walletRepository.GetOrCreateAsync(request.UserEmail.Trim().ToLowerInvariant(), cancellationToken);
+        // Record the top-up as a transaction to track volume
+        var tx = new PaymentTransaction
+        {
+            Reference = BuildReference("TOP"),
+            UserEmail = targetEmail,
+            Direction = "Receive",
+            CounterpartyName = "External Funding",
+            Country = "Global",
+            Method = "Top-Up",
+            Amount = request.Amount,
+            Currency = request.Currency.Trim().ToUpperInvariant(),
+            Status = "Completed",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        await transactionRepository.AddAsync(tx, cancellationToken);
+
+        var wallet = await walletRepository.GetOrCreateAsync(targetEmail, cancellationToken);
         var response = new WalletBalanceResponse(wallet.UserEmail, wallet.Balances, wallet.UpdatedAtUtc);
         return Results.Ok(response);
     }
+
+    // --- Mapping ---
 
     private static TransactionRecordResponse ToResponse(PaymentTransaction tx) =>
         new(tx.Reference, tx.Direction, tx.CounterpartyName, tx.Country, tx.Method, tx.Amount, tx.Currency, tx.Status, tx.CreatedAtUtc);
@@ -694,8 +893,19 @@ public static class PaymentsEndpoints
             request.UpdatedAtUtc,
             request.SettlementReference);
 
-    private static string BuildReference(string prefix) =>
-        $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+    /// <summary>
+    /// Generates a cryptographically-strong transaction reference.
+    /// Format: PREFIX-YYYYMMDDHHmmss-XXXXXXXX (8 hex chars from crypto-random).
+    /// </summary>
+    private static string BuildReference(string prefix)
+    {
+        var randomHex = Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
+        return $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{randomHex}";
+    }
+
+    private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    // --- Validation ---
 
     private static Dictionary<string, string[]> ValidateSend(SendPaymentRequest request)
     {
@@ -710,25 +920,45 @@ public static class PaymentsEndpoints
         {
             errors["destinationCountry"] = ["Destination country is required."];
         }
+        else if (request.DestinationCountry.Length > MaxCountryLength)
+        {
+            errors["destinationCountry"] = [$"Destination country must be {MaxCountryLength} characters or fewer."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.RecipientName))
         {
             errors["recipientName"] = ["Recipient name is required."];
+        }
+        else if (request.RecipientName.Length > MaxNameLength)
+        {
+            errors["recipientName"] = [$"Recipient name must be {MaxNameLength} characters or fewer."];
         }
 
         if (string.IsNullOrWhiteSpace(request.RecipientAccount))
         {
             errors["recipientAccount"] = ["Recipient account is required."];
         }
+        else if (request.RecipientAccount.Length > MaxAccountLength)
+        {
+            errors["recipientAccount"] = [$"Recipient account must be {MaxAccountLength} characters or fewer."];
+        }
 
         if (request.Amount <= 0)
         {
             errors["amount"] = ["Amount must be greater than zero."];
         }
+        else if (request.Amount > MaxTransferAmount)
+        {
+            errors["amount"] = [$"Amount must not exceed {MaxTransferAmount:N0}."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Currency))
         {
             errors["currency"] = ["Currency is required."];
+        }
+        else if (request.Currency.Length > MaxCurrencyLength)
+        {
+            errors["currency"] = [$"Currency code must be {MaxCurrencyLength} characters or fewer."];
         }
 
         return errors;
@@ -747,20 +977,36 @@ public static class PaymentsEndpoints
         {
             errors["sourceCountry"] = ["Source country is required."];
         }
+        else if (request.SourceCountry.Length > MaxCountryLength)
+        {
+            errors["sourceCountry"] = [$"Source country must be {MaxCountryLength} characters or fewer."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.SenderName))
         {
             errors["senderName"] = ["Sender name is required."];
+        }
+        else if (request.SenderName.Length > MaxNameLength)
+        {
+            errors["senderName"] = [$"Sender name must be {MaxNameLength} characters or fewer."];
         }
 
         if (request.Amount <= 0)
         {
             errors["amount"] = ["Amount must be greater than zero."];
         }
+        else if (request.Amount > MaxTransferAmount)
+        {
+            errors["amount"] = [$"Amount must not exceed {MaxTransferAmount:N0}."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Currency))
         {
             errors["currency"] = ["Currency is required."];
+        }
+        else if (request.Currency.Length > MaxCurrencyLength)
+        {
+            errors["currency"] = [$"Currency code must be {MaxCurrencyLength} characters or fewer."];
         }
 
         return errors;
@@ -779,20 +1025,36 @@ public static class PaymentsEndpoints
         {
             errors["country"] = ["Country is required."];
         }
+        else if (request.Country.Length > MaxCountryLength)
+        {
+            errors["country"] = [$"Country must be {MaxCountryLength} characters or fewer."];
+        }
 
         if (request.Amount <= 0)
         {
             errors["amount"] = ["Amount must be greater than zero."];
+        }
+        else if (request.Amount > MaxTransferAmount)
+        {
+            errors["amount"] = [$"Amount must not exceed {MaxTransferAmount:N0}."];
         }
 
         if (string.IsNullOrWhiteSpace(request.Currency))
         {
             errors["currency"] = ["Currency is required."];
         }
+        else if (request.Currency.Length > MaxCurrencyLength)
+        {
+            errors["currency"] = [$"Currency code must be {MaxCurrencyLength} characters or fewer."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Purpose))
         {
             errors["purpose"] = ["Purpose is required."];
+        }
+        else if (request.Purpose.Length > MaxNoteLength)
+        {
+            errors["purpose"] = [$"Purpose must be {MaxNoteLength} characters or fewer."];
         }
 
         return errors;
@@ -815,7 +1077,7 @@ public static class PaymentsEndpoints
         return errors;
     }
 
-    private static Dictionary<string, string[]> ValidateTopUp(WalletTopUpRequest request)
+    private static Dictionary<string, string[]> ValidateTopUp(WalletTopUpRequest request, decimal maxAmount)
     {
         var errors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
 
@@ -828,10 +1090,18 @@ public static class PaymentsEndpoints
         {
             errors["currency"] = ["Currency is required."];
         }
+        else if (request.Currency.Length > MaxCurrencyLength)
+        {
+            errors["currency"] = [$"Currency code must be {MaxCurrencyLength} characters or fewer."];
+        }
 
         if (request.Amount <= 0)
         {
             errors["amount"] = ["Amount must be greater than zero."];
+        }
+        else if (request.Amount > maxAmount)
+        {
+            errors["amount"] = [$"Amount must not exceed {maxAmount:N0} per transaction."];
         }
 
         return errors;
@@ -855,15 +1125,32 @@ public static class PaymentsEndpoints
         {
             errors["amount"] = ["Amount must be greater than zero."];
         }
+        else if (request.Amount > MaxTransferAmount)
+        {
+            errors["amount"] = [$"Amount must not exceed {MaxTransferAmount:N0}."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Currency))
         {
             errors["currency"] = ["Currency is required."];
         }
+        else if (request.Currency.Length > MaxCurrencyLength)
+        {
+            errors["currency"] = [$"Currency code must be {MaxCurrencyLength} characters or fewer."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Country))
         {
             errors["country"] = ["Country is required."];
+        }
+        else if (request.Country.Length > MaxCountryLength)
+        {
+            errors["country"] = [$"Country must be {MaxCountryLength} characters or fewer."];
+        }
+
+        if (request.Note is not null && request.Note.Length > MaxNoteLength)
+        {
+            errors["note"] = [$"Note must be {MaxNoteLength} characters or fewer."];
         }
 
         if (string.Equals(request.RequesterEmail?.Trim(), request.RecipientEmail?.Trim(), StringComparison.OrdinalIgnoreCase))
