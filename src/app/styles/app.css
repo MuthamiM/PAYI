@@ -94,3 +94,128 @@ button {
   cursor: pointer;
   transition: all var(--transition-fast);
 }
+
+/* ──── Button Variants ──── */
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  text-decoration: none;
+  gap: 8px;
+}
+
+.btn-primary {
+  background-color: var(--brand-primary);
+  color: #000;
+}
+
+.btn-primary:hover {
+  background-color: var(--brand-hover);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  backdrop-filter: var(--glass-blur);
+}
+
+.btn-secondary:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--brand-primary);
+  transform: translateY(-2px);
+}
+
+.hero-cta-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* ──── Download Section ──── */
+.download-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  padding: 40px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass-blur);
+  margin-top: 40px;
+}
+
+.download-badges {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.download-badge img {
+  height: 48px;
+  width: auto;
+  transition: transform var(--transition-fast);
+}
+
+.download-badge:hover img {
+  transform: scale(1.05);
+}
+
+.download-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.download-features li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.download-features li span {
+  color: var(--brand-primary);
+  font-weight: bold;
+}
+
+.download-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.phone-mockup {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  border: 8px solid #1a1a1a;
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(20, 184, 166, 0.2);
+}
+
+.phone-mockup img {
+  width: 100%;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .download-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  
+  .download-badges {
+    justify-content: center;
+  }
+  
+  .download-features li {
+    justify-content: center;
+  }
+}

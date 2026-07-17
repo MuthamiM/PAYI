@@ -3,11 +3,24 @@ import 'package:provider/provider.dart';
 
 import 'theme/theme.dart';
 import 'theme/colors.dart';
+import 'theme/widgets.dart';
 import 'providers/wallet_provider.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/search_contacts_screen.dart';
+import 'screens/balance_details_screen.dart';
+import 'screens/transfer_screen.dart';
+import 'screens/bank_transfer_screen.dart';
+import 'screens/pay_bills_screen.dart';
+import 'screens/scan_qr_screen.dart';
+import 'screens/topup_screen.dart';
+import 'screens/receive_money_screen.dart';
+import 'screens/transaction_details_screen.dart';
+import 'screens/auth_screen.dart';
+import 'screens/international_transfer_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     MultiProvider(
       providers: [
@@ -23,11 +36,12 @@ class PayiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.watch<WalletProvider>().isDarkMode;
     return MaterialApp(
       title: 'PAYI',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.saasTheme,
-      home: const DashboardSaaSScreen(), // Bypassed Auth Screen for Prototyping
+      theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
+      home: const AuthScreen(),
     );
   }
 }
@@ -38,437 +52,521 @@ class DashboardSaaSScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final mutedColor = theme.colorScheme.onSurface.withAlpha(153);
+    final primaryColor = theme.colorScheme.primary;
+
+    // Resolve numerical balance value for animated counter
+    double balanceValue = 0.0;
+    String currencySymbol = '\$';
+    String currencyCode = 'USD';
+    
+    if (walletProvider.wallet != null && walletProvider.wallet!.balances.isNotEmpty) {
+      if (walletProvider.wallet!.balances.containsKey('USD') && walletProvider.wallet!.balances['USD']! > 0) {
+        balanceValue = walletProvider.wallet!.balances['USD']!;
+      } else {
+        final entry = walletProvider.wallet!.balances.entries.first;
+        balanceValue = entry.value;
+        currencyCode = entry.key;
+        currencySymbol = '';
+      }
+    }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: walletProvider.fetchData,
-          color: AppColors.primaryTeal,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                // Top Section (App Header + Scan/Balance Pills)
-                Container(
-                  decoration: const BoxDecoration(
-                    color: AppColors.cardDark,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(32),
-                      bottomRight: Radius.circular(32),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ScanQrScreen()),
+          );
+        },
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        highlightElevation: 0,
+        child: Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withAlpha(100),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.qr_code_scanner,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
+      ),
+      body: GradientBackground(
+        child: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: walletProvider.fetchData,
+            color: primaryColor,
+            backgroundColor: theme.colorScheme.surface,
+            edgeOffset: 10,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    
+                    // --- App Header & Search ---
+                    Row(
                       children: [
-                        // Search Bar & Profile
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 48,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceGrey,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: const Color(0xFF2C3544),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.search,
-                                      color: AppColors.textMuted,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Expanded(
-                                      child: Text(
-                                        'Pay contacts or search...',
-                                        style: TextStyle(
-                                          color: AppColors.textMuted,
-                                          fontSize: 16,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ProfileScreen(),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColors.primaryTeal,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: AppColors.surfaceGrey,
-                                  child: Icon(
-                                    Icons.person,
-                                    color: AppColors.primaryTeal,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Scan and Balance Pills
-                        Row(
-                          children: [
-                            // Scan Button
-                            Expanded(
-                              flex: 2,
-                              child: Container(
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryTeal.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(
-                                    color: AppColors.primaryTeal.withOpacity(
-                                      0.5,
-                                    ),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.qr_code_scanner,
-                                      color: AppColors.primaryTeal,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Scan',
-                                      style: TextStyle(
-                                        color: AppColors.primaryTeal,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Balance Button
-                            Expanded(
-                              flex: 3,
-                              child: Container(
-                                height: 60,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceGrey,
-                                  borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(
-                                    color: const Color(0xFF2C3544),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.account_balance_wallet,
-                                      color: AppColors.textMuted,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'Total Balance',
-                                            style: TextStyle(
-                                              color: AppColors.textMuted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          walletProvider.isLoading
-                                              ? const SizedBox(
-                                                  height: 12,
-                                                  width: 12,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                        color: AppColors
-                                                            .primaryTeal,
-                                                      ),
-                                                )
-                                              : Text(
-                                                  walletProvider
-                                                      .formattedTotalUsd,
-                                                  style: const TextStyle(
-                                                    color: AppColors.textLight,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Action Grid
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildGridAction(Icons.qr_code, 'Scan any\nQR'),
-                          _buildGridAction(Icons.contacts, 'Pay\ncontacts'),
-                          _buildGridAction(
-                            Icons.phone_android,
-                            'Pay to\nphone no.',
-                          ),
-                          _buildGridAction(
-                            Icons.account_balance,
-                            'Bank\ntransfer',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildGridAction(Icons.receipt_long, 'Pay\nbills'),
-                          _buildGridAction(Icons.add_circle, 'Wallet\nTop-up'),
-                          _buildGridAction(
-                            Icons.arrow_downward,
-                            'Receive\nmoney',
-                          ),
-                          _buildGridAction(
-                            Icons.settings,
-                            'Settings',
+                        Expanded(
+                          child: GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const SettingsScreen(),
+                                  builder: (context) => const SearchContactsScreen(),
                                 ),
                               );
                             },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // People Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.only(left: 24, top: 16, bottom: 24),
-                  decoration: const BoxDecoration(
-                    color: AppColors.cardDark,
-                    border: Border(
-                      top: BorderSide(color: Color(0xFF2C3544)),
-                      bottom: BorderSide(color: Color(0xFF2C3544)),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(right: 24.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'People',
-                              style: TextStyle(
-                                color: AppColors.textLight,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                            child: GlassContainer(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              borderRadius: 20,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.search, color: mutedColor, size: 20),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Pay contacts or search...',
+                                      style: TextStyle(color: mutedColor, fontSize: 15),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: AppColors.textMuted,
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildPersonAvatar(
-                              'Alex',
-                              Colors.blue.withOpacity(0.2),
-                              iconColor: Colors.blueAccent,
-                            ),
-                            _buildPersonAvatar(
-                              'Sarah',
-                              Colors.pink.withOpacity(0.2),
-                              iconColor: Colors.pinkAccent,
-                            ),
-                            _buildPersonAvatar(
-                              'Mike',
-                              Colors.green.withOpacity(0.2),
-                              iconColor: Colors.greenAccent,
-                            ),
-                            _buildPersonAvatar(
-                              'Emma',
-                              Colors.orange.withOpacity(0.2),
-                              iconColor: Colors.orangeAccent,
-                            ),
-                            _buildPersonAvatar(
-                              'Topup',
-                              AppColors.primaryTeal.withOpacity(0.1),
-                              iconColor: AppColors.primaryTeal,
-                              isAction: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Recent Transactions Dynamic List
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Recent History',
-                            style: TextStyle(
-                              color: AppColors.textLight,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                            color: AppColors.textMuted,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (walletProvider.isLoading)
-                        const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primaryTeal,
-                          ),
-                        )
-                      else if (walletProvider.error != null &&
-                          walletProvider.transactions == null)
-                        Center(
-                          child: Text(
-                            'Error loading transactions:\n${walletProvider.error}',
-                            style: const TextStyle(color: AppColors.error),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      else if (walletProvider.transactions == null ||
-                          walletProvider.transactions!.isEmpty)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Text(
-                              'No transactions found.',
-                              style: TextStyle(color: AppColors.textMuted),
-                            ),
-                          ),
-                        )
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: walletProvider.transactions!
-                              .take(5)
-                              .length,
-                          itemBuilder: (context, index) {
-                            final tx = walletProvider.transactions![index];
-                            final isSend = tx.direction == 'Send';
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: isSend
-                                    ? AppColors.surfaceGrey
-                                    : AppColors.primaryTeal.withOpacity(0.1),
-                                child: Icon(
-                                  isSend
-                                      ? Icons.arrow_upward
-                                      : Icons.arrow_downward,
-                                  color: isSend
-                                      ? AppColors.textLight
-                                      : AppColors.primaryTeal,
-                                ),
-                              ),
-                              title: Text(
-                                tx.counterpartyName,
-                                style: const TextStyle(
-                                  color: AppColors.textLight,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                tx.method,
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              trailing: Text(
-                                '${isSend ? '-' : '+'}${tx.amount.toStringAsFixed(2)} ${tx.currency}',
-                                style: TextStyle(
-                                  color: isSend
-                                      ? AppColors.textLight
-                                      : AppColors.primaryTeal,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ProfileScreen()),
                             );
                           },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: primaryColor.withAlpha(100),
+                                width: 2,
+                              ),
+                            ),
+                            child: PulsingGlow(
+                              glowColor: primaryColor,
+                              maxRadius: 10,
+                              child: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: theme.colorScheme.surface,
+                                child: Icon(Icons.person, color: primaryColor, size: 24),
+                              ),
+                            ),
+                          ),
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- Hero Balance Card ---
+                    StaggeredSlideIn(
+                      index: 0,
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: isDark ? AppColors.heroCardGradient : AppColors.heroCardLightGradient,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: isDark ? Colors.white.withAlpha(15) : AppColors.surfaceLightBorder,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(isDark ? 40 : 10),
+                              blurRadius: 30,
+                              offset: const Offset(0, 15),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Stack(
+                            children: [
+                              // Decorative Background Shape
+                              Positioned(
+                                right: -50,
+                                top: -50,
+                                child: Container(
+                                  width: 180,
+                                  height: 180,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        primaryColor.withAlpha(isDark ? 30 : 15),
+                                        primaryColor.withAlpha(0),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'TOTAL BALANCE',
+                                          style: TextStyle(
+                                            color: mutedColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withAlpha(26),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            'Active',
+                                            style: TextStyle(
+                                              color: primaryColor,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    walletProvider.isLoading
+                                        ? const SizedBox(
+                                            height: 48,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: SizedBox(
+                                                height: 24,
+                                                width: 24,
+                                                child: CircularProgressIndicator(strokeWidth: 2.5),
+                                              ),
+                                            ),
+                                          )
+                                        : Row(
+                                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                                            textBaseline: TextBaseline.alphabetic,
+                                            children: [
+                                              AnimatedCounter(
+                                                targetValue: balanceValue,
+                                                prefix: currencySymbol,
+                                                suffix: currencySymbol.isEmpty ? ' $currencyCode' : '',
+                                                style: TextStyle(
+                                                  color: theme.colorScheme.onSurface,
+                                                  fontSize: 42,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: -1.0,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                    const SizedBox(height: 20),
+                                    Divider(color: isDark ? Colors.white.withAlpha(15) : AppColors.surfaceLightBorder),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(builder: (context) => const BalanceDetailsScreen()),
+                                            );
+                                          },
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                'View Multi-Currency Balances',
+                                                style: TextStyle(
+                                                  color: primaryColor,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Icon(Icons.arrow_forward_ios, size: 12, color: primaryColor),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          walletProvider.wallet != null 
+                                            ? 'Updated: just now'
+                                            : 'Connecting...',
+                                          style: TextStyle(color: mutedColor, fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // --- Grid Actions ---
+                    StaggeredSlideIn(
+                      index: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QUICK ACTIONS',
+                            style: TextStyle(
+                              color: mutedColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildActionItem(
+                                context,
+                                Icons.people_outline,
+                                'Pay Friends',
+                                const TransferScreen(),
+                                AppColors.primaryGradient,
+                              ),
+                              _buildActionItem(
+                                context,
+                                Icons.public_outlined,
+                                'Global Pay',
+                                const InternationalTransferScreen(),
+                                AppColors.premiumGradient,
+                              ),
+                              _buildActionItem(
+                                context,
+                                Icons.account_balance_outlined,
+                                'Bank Send',
+                                const BankTransferScreen(),
+                                AppColors.goldGradient,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildActionItem(
+                                context,
+                                Icons.receipt_long_outlined,
+                                'Pay Bills',
+                                const PayBillsScreen(),
+                                const LinearGradient(colors: [Colors.purple, Colors.pink]),
+                              ),
+                              _buildActionItem(
+                                context,
+                                Icons.add_circle_outline,
+                                'Top-up',
+                                const TopupScreen(),
+                                AppColors.receiveGradient,
+                              ),
+                              _buildActionItem(
+                                context,
+                                Icons.arrow_downward_outlined,
+                                'Receive',
+                                const ReceiveMoneyScreen(),
+                                AppColors.sendGradient,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // --- People Section ---
+                    StaggeredSlideIn(
+                      index: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'QUICK SEND',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const SearchContactsScreen()),
+                                  );
+                                },
+                                child: Text(
+                                  'View All',
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                _buildPersonAvatar(context, 'Alex', Colors.blue.withAlpha(40), Colors.blueAccent),
+                                _buildPersonAvatar(context, 'Sarah', Colors.pink.withAlpha(40), Colors.pinkAccent),
+                                _buildPersonAvatar(context, 'Mike', Colors.green.withAlpha(40), Colors.greenAccent),
+                                _buildPersonAvatar(context, 'Emma', Colors.orange.withAlpha(40), Colors.orangeAccent),
+                                _buildPersonAvatar(context, 'Add', primaryColor.withAlpha(20), primaryColor, isAction: true),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // --- Recent History ---
+                    StaggeredSlideIn(
+                      index: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'RECENT HISTORY',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              Icon(Icons.arrow_forward_ios, size: 14, color: mutedColor),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (walletProvider.isLoading)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else if (walletProvider.error != null && walletProvider.transactions == null)
+                            _buildHistoryErrorCard(theme, walletProvider.error!)
+                          else if (walletProvider.transactions == null || walletProvider.transactions!.isEmpty)
+                            _buildEmptyHistoryCard(mutedColor)
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: walletProvider.transactions!.take(5).length,
+                              itemBuilder: (context, index) {
+                                final tx = walletProvider.transactions![index];
+                                final isSend = tx.direction == 'Send';
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: GlassContainer(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    borderRadius: 18,
+                                    child: ListTile(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => TransactionDetailsScreen(transaction: tx),
+                                          ),
+                                        );
+                                      },
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: isSend ? AppColors.sendGradient : AppColors.receiveGradient,
+                                        ),
+                                        child: Icon(
+                                          isSend ? Icons.arrow_upward : Icons.arrow_downward,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        tx.counterpartyName,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        tx.method,
+                                        style: TextStyle(color: mutedColor, fontSize: 12),
+                                      ),
+                                      trailing: Text(
+                                        '${isSend ? '-' : '+'}${tx.amount.toStringAsFixed(2)} ${tx.currency}',
+                                        style: TextStyle(
+                                          color: isSend ? theme.colorScheme.onSurface : primaryColor,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          const SizedBox(height: 80), // Space for floating button
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -476,30 +574,105 @@ class DashboardSaaSScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGridAction(IconData icon, String label, {VoidCallback? onTap}) {
+  Widget _buildActionItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Widget targetScreen,
+    Gradient gradient,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: 70,
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (context) => targetScreen));
+      },
+      child: GlassContainer(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        borderRadius: 22,
+        child: SizedBox(
+          width: (MediaQuery.of(context).size.width - 72) / 3,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: gradient.colors.first.withAlpha(60),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonAvatar(
+    BuildContext context,
+    String name,
+    Color bgColor,
+    Color iconColor, {
+    bool isAction = false,
+  }) {
+    final theme = Theme.of(context);
+    final mutedColor = theme.colorScheme.onSurface.withAlpha(153);
+
+    return GestureDetector(
+      onTap: () {
+        if (isAction) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchContactsScreen()));
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => TransferScreen(initialRecipient: name)));
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 16),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceGrey,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppColors.primaryTeal, size: 28),
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: bgColor,
+              child: isAction
+                  ? Icon(Icons.add, color: iconColor, size: 26)
+                  : Text(
+                      name[0],
+                      style: TextStyle(
+                        color: iconColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                      ),
+                    ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textLight,
-                fontSize: 12,
-                height: 1.2,
-                fontWeight: FontWeight.w500,
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -508,38 +681,43 @@ class DashboardSaaSScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPersonAvatar(
-    String name,
-    Color bgColor, {
-    required Color iconColor,
-    bool isAction = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 24),
+  Widget _buildEmptyHistoryCard(Color mutedColor) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(32.0),
+      borderRadius: 24,
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.history_toggle_off, size: 40, color: mutedColor),
+            const SizedBox(height: 12),
+            Text(
+              'No transactions found.',
+              style: TextStyle(color: mutedColor, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryErrorCard(ThemeData theme, String error) {
+    return GlassContainer(
+      padding: const EdgeInsets.all(24.0),
+      borderRadius: 24,
+      borderColor: theme.colorScheme.error.withAlpha(100),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: bgColor,
-            child: isAction
-                ? Icon(Icons.add, color: iconColor, size: 32)
-                : Text(
-                    name[0],
-                    style: TextStyle(
-                      color: iconColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                    ),
-                  ),
-          ),
+          Icon(Icons.error_outline, color: theme.colorScheme.error, size: 36),
           const SizedBox(height: 12),
           Text(
-            name,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
+            'Failed to load transactions',
+            style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(153), fontSize: 12),
           ),
         ],
       ),

@@ -15,14 +15,42 @@ public sealed class AuthGuard : IEndpointFilter
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var httpContext = context.HttpContext;
+        var endpoint = httpContext.GetEndpoint();
+        if (endpoint?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() != null)
+        {
+            return await next(context);
+        }
+
         var principal = httpContext.User;
 
         if (principal?.Identity?.IsAuthenticated != true)
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Authentication required",
-                detail: "Provide a valid Bearer token in the Authorization header.");
+            var authHeader = httpContext.Request.Headers.Authorization.ToString();
+            if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var token = authHeader["Bearer ".Length..].Trim();
+                var tokenService = httpContext.RequestServices.GetRequiredService<ITokenService>();
+                var localPrincipal = tokenService.ValidateToken(token);
+
+                if (localPrincipal != null)
+                {
+                    principal = localPrincipal;
+                }
+                else
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status401Unauthorized,
+                        title: "Authentication required",
+                        detail: "Invalid token provided.");
+                }
+            }
+            else
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Authentication required",
+                    detail: "Provide a valid Bearer token in the Authorization header.");
+            }
         }
 
         Console.WriteLine("-------- JWT CLAIMS --------");
@@ -113,13 +141,23 @@ public sealed class AuthGuard : IEndpointFilter
                            ?? principal.FindFirst("name")?.Value 
                            ?? "Clerk User";
                            
+                var phone = principal.FindFirst(ClaimTypes.MobilePhone)?.Value
+                            ?? principal.FindFirst("phone_number")?.Value
+                            ?? httpContext.Request.Headers["X-User-Phone"].ToString()
+                            ?? string.Empty;
+
+                var currency = httpContext.Request.Headers["X-User-Currency"].ToString();
+                if (string.IsNullOrWhiteSpace(currency)) currency = "USD";
+
                 var newUser = new AppUser
                 {
                     Id = Guid.NewGuid(),
                     ClerkId = userId,
                     Name = name,
                     Email = email,
+                    PhoneNumber = phone,
                     Country = "Global",
+                    DefaultCurrency = currency,
                     PasswordHash = "clerk_managed_identity",
                     CreatedAtUtc = DateTimeOffset.UtcNow
                 };

@@ -6,17 +6,15 @@ function resolveApiOrigin() {
     return LOCAL_FALLBACK_ORIGIN;
   }
 
-  const { origin, protocol, hostname, port } = window.location;
+  const { hostname } = window.location;
 
-  if (port === API_PORT) {
-    return origin;
-  }
-
+  // Local development: use the local dev server
   if (hostname === "localhost" || hostname === "127.0.0.1") {
     return LOCAL_FALLBACK_ORIGIN;
   }
 
-  return `${protocol}//${hostname}:${API_PORT}`;
+  // Production / AWS: API is served from the same origin as the frontend
+  return window.location.origin;
 }
 
 export function toApiUrl(path) {

@@ -17,9 +17,11 @@ class Wallet {
       });
     }
     return Wallet(
-      userEmail: json['userEmail'],
+      userEmail: json['userEmail'] ?? '',
       balances: balMap,
-      updatedAtUtc: DateTime.parse(json['updatedAtUtc']),
+      updatedAtUtc: json['updatedAtUtc'] != null
+          ? DateTime.parse(json['updatedAtUtc'])
+          : DateTime.now(),
     );
   }
 }
@@ -51,16 +53,18 @@ class Transaction {
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
-      reference: json['reference'],
-      userEmail: json['userEmail'],
-      direction: json['direction'],
-      counterpartyName: json['counterpartyName'],
-      country: json['country'],
-      method: json['method'],
-      amount: (json['amount'] as num).toDouble(),
-      currency: json['currency'],
-      status: json['status'],
-      createdAtUtc: DateTime.parse(json['createdAtUtc']),
+      reference: json['reference'] ?? '',
+      userEmail: json['userEmail'] ?? '',
+      direction: json['direction'] ?? 'Send',
+      counterpartyName: json['counterpartyName'] ?? 'Unknown',
+      country: json['country'] ?? '',
+      method: json['method'] ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency'] ?? 'USD',
+      status: json['status'] ?? 'Unknown',
+      createdAtUtc: json['createdAtUtc'] != null
+          ? DateTime.parse(json['createdAtUtc'])
+          : DateTime.now(),
     );
   }
 }

@@ -9,16 +9,18 @@ using Payi.Api.Features.Platform.Endpoints;
 using Payi.Api.Features.Platform.Services;
 using Payi.Api.Features.System.Endpoints;
 using Payi.Api.Features.System.Services;
+using Payi.Api.Features.Kyc.Endpoints;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Stripe;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Kestrel: restrict request body size (1 MB max for JSON-only API) ---
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 1_048_576;
+    options.Limits.MaxRequestBodySize = 10_485_760; // 10 MB for KYC file uploads
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -60,11 +62,22 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AppCors", policy =>
     {
-        policy
-            .WithOrigins(allowedOrigins)
-            .WithMethods("GET", "POST", "OPTIONS")
-            .AllowAnyHeader()
-            .AllowCredentials();
+        if (allowedOrigins.Contains("*"))
+        {
+            policy
+                .SetIsOriginAllowed(origin => true)
+                .WithMethods("GET", "POST", "OPTIONS")
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
+        else
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .WithMethods("GET", "POST", "OPTIONS")
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
     });
 });
 
@@ -122,6 +135,12 @@ builder.Services.AddSingleton<IContactRepository, JsonContactRepository>();
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
 builder.Services.AddSingleton<LoginThrottleService>();
 builder.Services.AddSingleton(new RuntimeMetadata(DateTimeOffset.UtcNow));
+
+var secretKey = builder.Configuration["Stripe:SecretKey"];
+if (!string.IsNullOrEmpty(secretKey))
+{
+    StripeConfiguration.ApiKey = secretKey;
+}
 
 var app = builder.Build();
 
@@ -189,27 +208,25 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.UseOutputCache();
 
-// --- Swagger: only in Development ---
-if (app.Environment.IsDevelopment())
+// --- Swagger: available in all environments for API exploration ---
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.DocumentTitle = "PAYI API Docs";
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "PAYI API v1");
-        options.RoutePrefix = "swagger";
-    });
-}
+    options.DocumentTitle = "PAYI API Docs";
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "PAYI API v1");
+    options.RoutePrefix = "swagger";
+});
 
 AuthEndpoints.Map(app);
 PaymentsEndpoints.Map(app);
 PlatformEndpoints.Map(app);
 SystemEndpoints.Map(app);
+KycEndpoints.Map(app);
 
 var frontendRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", ".."));
 var indexFile = Path.Combine(frontendRoot, "index.html");
 
-if (File.Exists(indexFile))
+if (System.IO.File.Exists(indexFile))
 {
     var staticProvider = new PhysicalFileProvider(frontendRoot);
     var defaultFilesOptions = new DefaultFilesOptions

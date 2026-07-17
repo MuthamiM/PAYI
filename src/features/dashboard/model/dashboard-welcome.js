@@ -113,6 +113,24 @@ function mapRow(row) {
     tr.appendChild(td);
   });
 
+  // Action Column: Pay Again
+  const actionTd = document.createElement("td");
+  if (row.direction === "Outgoing" || row.status === "Settled") {
+    const reuseBtn = document.createElement("button");
+    reuseBtn.type = "button";
+    reuseBtn.className = "text-btn";
+    reuseBtn.textContent = "Reuse";
+    reuseBtn.dataset.reuseTransaction = JSON.stringify({
+      recipientAccount: row.counterpartyAccount || row.counterpartyName,
+      recipientName: row.counterpartyName,
+      amount: row.amount,
+      currency: row.currency,
+      destinationCountry: row.country
+    });
+    actionTd.appendChild(reuseBtn);
+  }
+  tr.appendChild(actionTd);
+
   return tr;
 }
 
@@ -909,6 +927,80 @@ function wireNotifications(root, user, refreshHistory) {
       }
     });
   }
+
+  // ──── Quick Actions ────
+  const wireQuickActions = () => {
+    const actionsBar = root.querySelector(".quick-actions-bar");
+    const qrWidget = root.querySelector("[data-personal-qr-widget]");
+    const qrImage = root.querySelector("[data-personal-qr-image]");
+    const qrPayload = root.querySelector("[data-personal-qr-payload]");
+    const closeQr = root.querySelector("[data-close-qr]");
+    const showQrBtn = root.querySelector("[data-quick-action='my-qr']");
+
+    if (!actionsBar) return;
+
+    actionsBar.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-quick-action]");
+      if (!btn) return;
+
+      const action = btn.dataset.quickAction;
+      if (action === "send") {
+        const target = root.querySelector("[data-send-form]");
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (action === "receive") {
+        const target = root.querySelector("[data-receive-form]");
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (action === "request") {
+        const target = root.querySelector("#notifications");
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+
+    const toggleQr = () => {
+      if (!qrWidget) return;
+      const isHidden = qrWidget.hidden;
+      if (isHidden) {
+        const payload = `payi://pay?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.fullName || user.name)}`;
+        if (qrPayload) qrPayload.textContent = payload;
+        if (qrImage) {
+          qrImage.src = toApiUrl(`/api/payments/qr/image?payload=${encodeURIComponent(payload)}&ts=${Date.now()}`);
+        }
+        qrWidget.hidden = false;
+      } else {
+        qrWidget.hidden = true;
+      }
+    };
+
+    if (showQrBtn) showQrBtn.addEventListener("click", toggleQr);
+    if (closeQr) closeQr.addEventListener("click", () => { if (qrWidget) qrWidget.hidden = true; });
+  };
+
+  // ──── Pay Again (Reuse) ────
+  const wireReuseButtons = () => {
+    const historyBody = root.querySelector("[data-history-body]");
+    if (!historyBody) return;
+
+    historyBody.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-reuse-transaction]");
+      if (!btn) return;
+
+      const data = JSON.parse(btn.dataset.reuseTransaction);
+      const sendForm = root.querySelector("[data-send-form]");
+      if (!sendForm) return;
+
+      sendForm.querySelector("input[name='recipientAccount']").value = data.recipientAccount || "";
+      sendForm.querySelector("input[name='recipientName']").value = data.recipientName || "";
+      sendForm.querySelector("input[name='amount']").value = data.amount || "";
+      sendForm.querySelector("select[name='currency']").value = data.currency || "KES";
+      sendForm.querySelector("select[name='destinationCountry']").value = normalizeCountry(data.destinationCountry);
+      
+      sendForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      sendForm.querySelector("input[name='amount']").focus();
+    });
+  };
+
+  wireQuickActions();
+  wireReuseButtons();
 
   return async () => {
     await Promise.all([loadNotifications(), updateWalletSummary()]);

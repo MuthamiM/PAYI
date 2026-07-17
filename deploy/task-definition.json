@@ -1,0 +1,65 @@
+{
+  "family": "payi-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "payi-api",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/payi-api:latest",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ASPNETCORE_ENVIRONMENT",
+          "value": "Production"
+        },
+        {
+          "name": "ASPNETCORE_URLS",
+          "value": "http://+:8080"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "Clerk__Authority",
+          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/payi/clerk-authority"
+        },
+        {
+          "name": "Jwt__SigningKey",
+          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/payi/jwt-signing-key"
+        },
+        {
+          "name": "Stripe__SecretKey",
+          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/payi/stripe-secret-key"
+        },
+        {
+          "name": "Stripe__PublishableKey",
+          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/payi/stripe-publishable-key"
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/api/system/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/payi-api",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "payi"
+        }
+      },
+      "essential": true
+    }
+  ]
+}

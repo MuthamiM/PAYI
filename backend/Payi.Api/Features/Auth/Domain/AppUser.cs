@@ -6,7 +6,10 @@ public sealed class AppUser
     public string ClerkId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
+    public string PhoneNumber { get; init; } = string.Empty;
     public string Country { get; init; } = string.Empty;
+    public string DefaultCurrency { get; init; } = "USD";
     public string PasswordHash { get; init; } = string.Empty;
     public DateTimeOffset CreatedAtUtc { get; init; }
+    public string KycStatus { get; init; } = "Unverified";
 }

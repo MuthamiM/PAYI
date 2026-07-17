@@ -8,6 +8,7 @@ using Payi.Api.Features.Payments.Domain;
 using Payi.Api.Features.Payments.Services;
 using Payi.Api.Features.System.Services;
 using QRCoder;
+using Stripe;
 
 namespace Payi.Api.Features.Payments.Endpoints;
 
@@ -91,7 +92,8 @@ public static class PaymentsEndpoints
             .WithSummary("Generate QR image for payload")
             .WithDescription("Returns a PNG QR image for a PAYI QR payload.")
             .Produces(StatusCodes.Status200OK, contentType: "image/png")
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .AllowAnonymous();
 
         group.MapPost("/qr/pay", PayQrAsync)
             .WithName("PayQrPayment")
@@ -113,6 +115,15 @@ public static class PaymentsEndpoints
             .WithDescription("Credits wallet balance. Requires authentication.")
             .Produces<WalletBalanceResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem();
+
+        group.MapGet("/stripe/publishable-key", GetStripeKey)
+            .WithName("GetStripeKey");
+
+        group.MapPost("/stripe/create-intent", CreateStripeIntentAsync)
+            .WithName("CreateStripeIntent");
+
+        group.MapPost("/stripe/confirm", ConfirmStripeIntentAsync)
+            .WithName("ConfirmStripeIntent");
     }
 
     /// <summary>
@@ -869,6 +880,116 @@ public static class PaymentsEndpoints
         var wallet = await walletRepository.GetOrCreateAsync(targetEmail, cancellationToken);
         var response = new WalletBalanceResponse(wallet.UserEmail, wallet.Balances, wallet.UpdatedAtUtc);
         return Results.Ok(response);
+    }
+
+    private static IResult GetStripeKey(IConfiguration config)
+    {
+        var key = config["Stripe:PublishableKey"];
+        return Results.Ok(new { PublishableKey = key });
+    }
+
+    private static async Task<IResult> CreateStripeIntentAsync(
+        HttpContext httpContext,
+        StripePaymentIntentRequest request,
+        IConfiguration config)
+    {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(statusCode: 403, title: "Forbidden", detail: "Can only top up own wallet.");
+        }
+
+        var amountInCents = (long)(request.Amount * 100);
+
+        var options = new PaymentIntentCreateOptions
+        {
+            Amount = amountInCents,
+            Currency = request.Currency.Trim().ToLowerInvariant(),
+            ReceiptEmail = targetEmail,
+            Metadata = new Dictionary<string, string>
+            {
+                { "userEmail", targetEmail }
+            }
+        };
+
+        var service = new PaymentIntentService();
+        try
+        {
+            var intent = await service.CreateAsync(options);
+            return Results.Ok(new StripePaymentIntentResponse(
+                intent.ClientSecret,
+                intent.Id,
+                config["Stripe:PublishableKey"] ?? ""));
+        }
+        catch (StripeException e)
+        {
+            return Results.Problem(statusCode: 400, title: "Stripe Error", detail: e.StripeError.Message);
+        }
+    }
+
+    private static async Task<IResult> ConfirmStripeIntentAsync(
+        HttpContext httpContext,
+        StripeConfirmRequest request,
+        IWalletRepository walletRepository,
+        ITransactionRepository transactionRepository,
+        CancellationToken cancellationToken)
+    {
+        var authEmail = GetAuthEmail(httpContext);
+        var targetEmail = NormalizeEmail(request.UserEmail);
+
+        if (!string.Equals(authEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Problem(statusCode: 403, title: "Forbidden", detail: "Can only confirm own top up.");
+        }
+
+        var service = new PaymentIntentService();
+        try
+        {
+            var intent = await service.GetAsync(request.PaymentIntentId, cancellationToken: cancellationToken);
+
+            if (intent.Status == "succeeded")
+            {
+                if (!intent.Metadata.TryGetValue("userEmail", out var metaEmail) || 
+                    !string.Equals(metaEmail, targetEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Results.Problem(statusCode: 400, title: "Invalid", detail: "Payment intent does not match user.");
+                }
+
+                var amount = intent.Amount / 100.0m;
+
+                await walletRepository.CreditAsync(
+                    targetEmail,
+                    request.Currency.Trim().ToUpperInvariant(),
+                    amount,
+                    cancellationToken);
+
+                var tx = new PaymentTransaction
+                {
+                    Reference = BuildReference("STRIPE"),
+                    UserEmail = targetEmail,
+                    Direction = "Receive",
+                    CounterpartyName = "Card Deposit",
+                    Country = "Global",
+                    Method = "Stripe",
+                    Amount = amount,
+                    Currency = request.Currency.Trim().ToUpperInvariant(),
+                    Status = "Completed",
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                };
+                await transactionRepository.AddAsync(tx, cancellationToken);
+                
+                var wallet = await walletRepository.GetOrCreateAsync(targetEmail, cancellationToken);
+                return Results.Ok(new WalletBalanceResponse(wallet.UserEmail, wallet.Balances, wallet.UpdatedAtUtc));
+            }
+
+            return Results.Problem(statusCode: 400, title: "Payment Not Succeeded", detail: $"Status is {intent.Status}");
+        }
+        catch (StripeException e)
+        {
+            return Results.Problem(statusCode: 400, title: "Stripe Error", detail: e.StripeError.Message);
+        }
     }
 
     // --- Mapping ---

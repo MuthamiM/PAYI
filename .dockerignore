@@ -1,0 +1,36 @@
+**/.git
+**/.gitignore
+**/.vscode
+**/.idea
+
+# Build artifacts
+**/bin
+**/obj
+**/build
+
+# Mobile app (not needed in container)
+payi_mobile/
+
+# Documentation & non-essential files
+*.md
+*.lnk
+flow_diagrams.md
+build_output.txt
+VLC media player.lnk
+
+# Environment & secrets
+.env
+.env.*
+*.secrets.json
+secrets.json
+
+# Deploy scripts (not needed inside the image)
+deploy/
+
+# Codex
+.codex-run/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml

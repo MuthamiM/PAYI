@@ -10,12 +10,29 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/auth")
             .WithTags("Auth")
-            .AddEndpointFilter<AuthGuard>()
             .RequireRateLimiting("GeneralRateLimit");
+
+        group.MapPost("/register", RegisterAsync)
+            .WithName("Register")
+            .WithSummary("Register a new user")
+            .AllowAnonymous();
+
+        group.MapPost("/login", LoginAsync)
+            .WithName("Login")
+            .WithSummary("Local login")
+            .AllowAnonymous();
+
+        group.MapPost("/reset-password", ResetPasswordAsync)
+            .WithName("ResetPassword")
+            .WithSummary("Reset password stub")
+            .AllowAnonymous();
+
+        var authenticatedGroup = group.MapGroup("/")
+            .AddEndpointFilter<AuthGuard>();
 
         // Returns the authenticated user's own directory listing (names/emails of all users for the send-to autocomplete).
         // Sensitive fields (password hash, IDs) are stripped.
-        group.MapGet("/users", GetUsersAsync)
+        authenticatedGroup.MapGet("/users", GetUsersAsync)
             .WithName("ListUsers")
             .WithSummary("List user directory")
             .WithDescription("Returns a minimal directory of users (name/email) for recipient lookup. Requires authentication.")
@@ -23,7 +40,7 @@ public static class AuthEndpoints
             .CacheOutput("ShortApi");
 
         // Returns only the authenticated user's own profile by their ID
-        group.MapGet("/users/{id:guid}", GetUserByIdAsync)
+        authenticatedGroup.MapGet("/users/{id:guid}", GetUserByIdAsync)
             .WithName("GetUserById")
             .WithSummary("Get a user profile by ID")
             .WithDescription("Returns one registered user profile. Only your own profile is accessible.")
@@ -32,7 +49,7 @@ public static class AuthEndpoints
             .CacheOutput("ShortApi");
 
         // Returns the currently authenticated user's own profile
-        group.MapGet("/me", GetOwnProfileAsync)
+        authenticatedGroup.MapGet("/me", GetOwnProfileAsync)
             .WithName("GetOwnProfile")
             .WithSummary("Get your own profile")
             .WithDescription("Returns the currently authenticated user's profile information.")
@@ -116,6 +133,64 @@ public static class AuthEndpoints
         return Results.Ok(ToProfile(user));
     }
 
+    private static async Task<IResult> RegisterAsync(
+        RegisterRequest request,
+        IUserRepository userRepository,
+        IPasswordService passwordService,
+        ITokenService tokenService,
+        Payi.Api.Features.Payments.Services.IWalletRepository walletRepository,
+        CancellationToken cancellationToken)
+    {
+        var existing = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        if (existing is not null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Email already registered");
+        }
+
+        var user = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name,
+            Email = request.Email,
+            PhoneNumber = request.PhoneNumber,
+            Country = request.Country,
+            DefaultCurrency = "USD", 
+            PasswordHash = passwordService.Hash(request.Password),
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        await userRepository.AddAsync(user, cancellationToken);
+        await walletRepository.GetOrCreateAsync(user.Email, cancellationToken);
+
+        var token = tokenService.IssueToken(user);
+        return Results.Ok(new { Token = token, user.Email, user.Name });
+    }
+
+    private static async Task<IResult> LoginAsync(
+        LoginRequest request,
+        IUserRepository userRepository,
+        IPasswordService passwordService,
+        ITokenService tokenService,
+        CancellationToken cancellationToken)
+    {
+        var user = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        if (user is null || !passwordService.Verify(request.Password, user.PasswordHash))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Invalid email or password");
+        }
+
+        var token = tokenService.IssueToken(user);
+        return Results.Ok(new { Token = token, email = user.Email, name = user.Name, phone = user.PhoneNumber, currency = user.DefaultCurrency });
+    }
+
+    private static Task<IResult> ResetPasswordAsync(
+        LoginRequest request, // Reusing LoginRequest for email only
+        CancellationToken cancellationToken)
+    {
+        // This is a stub. In a real app, it would send an email.
+        return Task.FromResult(Results.Ok(new { Message = "If an account exists, a reset link has been sent." }));
+    }
+
     private static UserProfileResponse ToProfile(AppUser user) =>
-        new(user.Id, user.Name, user.Email, user.Country, user.CreatedAtUtc);
+        new(user.Id, user.Name, user.Email, user.PhoneNumber, user.Country, user.DefaultCurrency, user.CreatedAtUtc);
 }
