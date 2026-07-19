@@ -2588,3 +2588,304 @@ html {
     transform: none;
   }
 }
+
+/* ─── Sticky Premium Navigation ─── */
+.sticky-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(9, 14, 23, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 24px;
+  margin: -20px -20px 24px -20px;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  transition: all var(--transition-smooth);
+}
+
+.sticky-nav__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.sticky-nav__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.sticky-nav__logo img {
+  width: 36px;
+  height: 36px;
+}
+
+.sticky-nav__logo span {
+  color: #f2fbf8;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.sticky-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.sticky-nav__links .nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.sticky-nav__links .nav-link:hover {
+  color: var(--brand-primary);
+}
+
+.sticky-nav__auth {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sticky-nav__auth .nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.sticky-nav__auth .nav-link:hover {
+  color: var(--brand-primary);
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: 40px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.nav-btn--primary {
+  background: var(--brand-primary);
+  color: #090e17 !important;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.25);
+}
+
+.nav-btn--primary:hover {
+  background: var(--brand-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(20, 184, 166, 0.35);
+}
+
+/* Hamburger Toggle */
+.hamburger-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 24px;
+  height: 18px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 1001;
+}
+
+.hamburger-bar {
+  width: 100%;
+  height: 2px;
+  background-color: var(--text-main);
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile Menu */
+.mobile-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: rgba(9, 14, 23, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px;
+  flex-direction: column;
+  gap: 18px;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu.is-active {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.mobile-menu__link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.mobile-menu__link:hover {
+  color: var(--brand-primary);
+}
+
+.mobile-menu__auth {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 18px;
+}
+
+.mobile-menu__auth .nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+/* Active Menu State for Hamburger */
+.hamburger-toggle.is-active .hamburger-bar:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
+}
+
+.hamburger-toggle.is-active .hamburger-bar:nth-child(2) {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.hamburger-toggle.is-active .hamburger-bar:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
+}
+
+/* Responsive Rules for Nav */
+@media (max-width: 860px) {
+  .sticky-nav__links,
+  .sticky-nav__auth {
+    display: none;
+  }
+
+  .hamburger-toggle {
+    display: flex;
+  }
+}
+
+/* ─── Web Dashboard SVG & Action Buttons Redesign ─── */
+.btn-dashboard-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all var(--transition-fast);
+}
+
+.btn-dashboard-action:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.btn-svg-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--transition-fast);
+}
+
+.btn-dashboard-action:hover .btn-svg-icon {
+  transform: scale(1.1);
+}
+
+.quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: all var(--transition-smooth);
+  width: 110px;
+}
+
+.quick-btn:hover {
+  background: rgba(20, 184, 166, 0.05);
+  border-color: var(--brand-primary);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.15);
+  transform: translateY(-4px);
+}
+
+.quick-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--brand-primary);
+  transition: all var(--transition-smooth);
+}
+
+.quick-btn__icon svg {
+  width: 22px;
+  height: 22px;
+  transition: transform var(--transition-smooth);
+}
+
+.quick-btn:hover .quick-btn__icon {
+  background: var(--brand-primary);
+  color: #090e17;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.3);
+}
+
+.quick-btn:hover .quick-btn__icon svg {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+.quick-btn__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: color var(--transition-fast);
+}
+
+.quick-btn:hover .quick-btn__label {
+  color: var(--brand-primary);
+}

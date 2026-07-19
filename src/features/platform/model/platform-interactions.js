@@ -304,6 +304,36 @@ function wirePayoutChecker(root) {
   });
 }
 
+// ──── Hamburger Menu ────
+function wireHamburgerMenu(root) {
+  const toggle = root.querySelector("#hamburger-toggle");
+  const menu = root.querySelector("#mobile-menu");
+
+  if (!toggle || !menu) return;
+
+  toggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isActive = toggle.classList.toggle("is-active");
+    menu.classList.toggle("is-active", isActive);
+  });
+
+  // Close menu when clicking links
+  menu.addEventListener("click", (e) => {
+    if (e.target.closest("a") || e.target.closest("button")) {
+      toggle.classList.remove("is-active");
+      menu.classList.remove("is-active");
+    }
+  });
+
+  // Close menu when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#sticky-nav")) {
+      toggle.classList.remove("is-active");
+      menu.classList.remove("is-active");
+    }
+  });
+}
+
 // ──── Main Export ────
 export function wirePlatformInteractions(root) {
   if (!root) return;
@@ -320,4 +350,5 @@ export function wirePlatformInteractions(root) {
   wireFloatingNotes(root);
   wireEmailCta(root);
   wireMockupRows(root);
+  wireHamburgerMenu(root);
 }

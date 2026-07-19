@@ -61,15 +61,47 @@ function createHeader(activePage) {
   const authHash = typeof window !== "undefined" ? window.location.hash : "#login";
   const user = getSessionUser();
   const userBadge = user?.name ? `<p class="user-chip">Signed in: ${user.name}</p>` : "";
+  const authed = isAuthenticated();
 
   if (activePage === "home") {
+    const authBtns = authed
+      ? `<a href="/dashboard.html" class="nav-btn nav-btn--primary">Dashboard</a>`
+      : `<a href="/auth.html#login" class="nav-link">Login</a>
+         <a href="/auth.html#register" class="nav-btn nav-btn--primary">Get Started</a>`;
+
     return `
-      <header class="showcase-header">
-        <a class="showcase-logo" href="/index.html" aria-label="PAYI home">
-          <img src="/src/assets/payi-logo.svg" alt="PAYI logo" />
-          <span>PAYI</span>
-        </a>
-        <p class="showcase-title">Cross-Border Payments</p>
+      <header class="sticky-nav" id="sticky-nav">
+        <div class="sticky-nav__inner">
+          <a class="sticky-nav__logo" href="/index.html" aria-label="PAYI home">
+            <img src="/src/assets/payi-logo.svg" alt="PAYI logo" />
+            <span>PAYI</span>
+          </a>
+          <nav class="sticky-nav__links" id="nav-links">
+            <a href="/about.html" class="nav-link">Our Story</a>
+            <a href="/how-it-works.html" class="nav-link">What We Do</a>
+            <a href="#features" data-scroll-to="features" class="nav-link">Features</a>
+            <a href="#pricing" data-scroll-to="pricing" class="nav-link">Pricing</a>
+            <a href="#download" data-scroll-to="download" class="nav-link">Download</a>
+          </nav>
+          <div class="sticky-nav__auth">
+            ${authBtns}
+          </div>
+          <button type="button" class="hamburger-toggle" id="hamburger-toggle" aria-label="Toggle navigation menu">
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+          </button>
+        </div>
+        <div class="mobile-menu" id="mobile-menu">
+          <a href="/about.html" class="mobile-menu__link">Our Story</a>
+          <a href="/how-it-works.html" class="mobile-menu__link">What We Do</a>
+          <a href="#features" data-scroll-to="features" class="mobile-menu__link">Features</a>
+          <a href="#pricing" data-scroll-to="pricing" class="mobile-menu__link">Pricing</a>
+          <a href="#download" data-scroll-to="download" class="mobile-menu__link">Download</a>
+          <div class="mobile-menu__auth">
+            ${authBtns}
+          </div>
+        </div>
       </header>
     `;
   }
@@ -97,23 +129,6 @@ function createHomeMain() {
           <span class="announce-arrow">&rarr;</span>
         </a>
 
-        <div class="hero-nav-row">
-          <div class="hero-mini-brand">
-            <img src="/src/assets/payi-logo.svg" alt="PAYI mini logo" />
-            <span>PAYI</span>
-          </div>
-          <nav class="hero-mini-nav">
-            <a href="#features" data-scroll-to="features">Features</a>
-            <a href="#why-payi" data-scroll-to="why-payi">Why PAYI?</a>
-            <a href="#pricing" data-scroll-to="pricing">Pricing</a>
-            <a href="#reviews" data-scroll-to="reviews">Reviews</a>
-            <a href="#faq" data-scroll-to="faq">FAQs</a>
-          </nav>
-          <div class="hero-mini-auth">
-            <a href="/auth.html#login">Login</a>
-            <a href="/auth.html#register" class="hero-signup">Signup</a>
-          </div>
-        </div>
 
         <div class="hero-copy-grid">
           <aside class="floating-note floating-note-left" data-click-navigate="/dashboard.html" role="button" tabindex="0">
@@ -565,21 +580,51 @@ function createDashboardMain() {
       <h1 data-dashboard-greeting>Welcome.</h1>
       <p data-dashboard-subtitle>Loading your dashboard profile...</p>
       <div class="dashboard-top-actions">
-        <button type="button" data-open-notifications>Notifications</button>
-        <button type="button" data-quick-action="my-qr" class="secondary-btn">Show My QR</button>
+        <button type="button" data-open-notifications class="btn-dashboard-action">
+          <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span>Notifications</span>
+        </button>
+        <button type="button" data-quick-action="my-qr" class="secondary-btn btn-dashboard-action">
+          <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Show My QR</span>
+        </button>
       </div>
 
       <div class="quick-actions-bar">
         <button type="button" data-quick-action="send" class="quick-btn">
-          <span class="quick-btn__icon">💸</span>
+          <span class="quick-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </span>
           <span class="quick-btn__label">Send</span>
         </button>
         <button type="button" data-quick-action="receive" class="quick-btn">
-          <span class="quick-btn__icon">📥</span>
+          <span class="quick-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 10 12 15 7 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+              <path d="M20 17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2"></path>
+            </svg>
+          </span>
           <span class="quick-btn__label">Receive</span>
         </button>
         <button type="button" data-quick-action="request" class="quick-btn">
-          <span class="quick-btn__icon">🔔</span>
+          <span class="quick-btn__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </span>
           <span class="quick-btn__label">Request</span>
         </button>
       </div>
