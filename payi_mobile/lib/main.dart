@@ -433,7 +433,7 @@ class _DashboardSaaSScreenState extends State<DashboardSaaSScreen>
                     const SizedBox(height: 28),
 
                     // ═══════════════════════════════════════
-                    // ACTION CHIPS (Horizontal Scrollable)
+                    // QUICK ACTIONS (Grid Layout)
                     // ═══════════════════════════════════════
                     StaggeredSlideIn(
                       index: 2,
@@ -448,19 +448,24 @@ class _DashboardSaaSScreenState extends State<DashboardSaaSScreen>
                             ),
                           ),
                           const SizedBox(height: 14),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            child: Row(
-                              children: [
-                                _buildActionChip(context, Icons.send_rounded, 'Send', const TransferScreen(), AppColors.primaryGradient),
-                                _buildActionChip(context, Icons.call_received_rounded, 'Receive', const ReceiveMoneyScreen(), AppColors.receiveGradient),
-                                _buildActionChip(context, Icons.add_card, 'Top-up', const TopupScreen(), AppColors.goldGradient),
-                                _buildActionChip(context, Icons.receipt_long, 'Bills', const PayBillsScreen(), const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)])),
-                                _buildActionChip(context, Icons.public, 'Global', const InternationalTransferScreen(), AppColors.premiumGradient),
-                                _buildActionChip(context, Icons.account_balance, 'Bank', const BankTransferScreen(), const LinearGradient(colors: [Color(0xFF0EA5E9), Color(0xFF0284C7)])),
-                              ],
-                            ),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final spacing = 12.0;
+                              final columns = 3;
+                              final tileWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                              return Wrap(
+                                spacing: spacing,
+                                runSpacing: spacing,
+                                children: [
+                                  _buildActionTile(context, Icons.send_rounded, 'Send', const TransferScreen(), AppColors.primaryGradient, tileWidth),
+                                  _buildActionTile(context, Icons.call_received_rounded, 'Receive', const ReceiveMoneyScreen(), AppColors.receiveGradient, tileWidth),
+                                  _buildActionTile(context, Icons.add_card, 'Top-up', const TopupScreen(), AppColors.goldGradient, tileWidth),
+                                  _buildActionTile(context, Icons.receipt_long, 'Bills', const PayBillsScreen(), const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)]), tileWidth),
+                                  _buildActionTile(context, Icons.public, 'Global', const InternationalTransferScreen(), AppColors.premiumGradient, tileWidth),
+                                  _buildActionTile(context, Icons.account_balance, 'Bank', const BankTransferScreen(), const LinearGradient(colors: [Color(0xFF0EA5E9), Color(0xFF0284C7)]), tileWidth),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -858,18 +863,18 @@ class _DashboardSaaSScreenState extends State<DashboardSaaSScreen>
     );
   }
 
-  Widget _buildActionChip(BuildContext context, IconData icon, String label,
-      Widget screen, Gradient gradient) {
+  Widget _buildActionTile(BuildContext context, IconData icon, String label,
+      Widget screen, Gradient gradient, double width) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
       child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        width: width,
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: isDark ? Colors.white.withAlpha(6) : Colors.white,
-          borderRadius: BorderRadius.circular(40),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isDark ? Colors.white.withAlpha(10) : Colors.grey.withAlpha(25),
           ),
@@ -881,15 +886,15 @@ class _DashboardSaaSScreenState extends State<DashboardSaaSScreen>
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 32, height: 32,
+              width: 44, height: 44,
               decoration: BoxDecoration(gradient: gradient, shape: BoxShape.circle),
-              child: Icon(icon, color: Colors.white, size: 16),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(height: 10),
             Text(label, style: TextStyle(
               color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.w700, fontSize: 13,

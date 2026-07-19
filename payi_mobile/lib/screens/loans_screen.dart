@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import '../theme/colors.dart';
 import '../theme/widgets.dart';
 
@@ -401,7 +402,7 @@ class _LoansScreenState extends State<LoansScreen> with SingleTickerProviderStat
                     controller: amountController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Amount ($)',
+                      labelText: 'Amount (\$)',
                       hintText: 'e.g., 5000',
                     ),
                     onChanged: (val) {
@@ -548,7 +549,6 @@ class _LoansScreenState extends State<LoansScreen> with SingleTickerProviderStat
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
-}
 
   Widget _buildLoanMeta(BuildContext context, String label, String value) {
     final theme = Theme.of(context);

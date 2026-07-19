@@ -413,7 +413,7 @@ class _SavingsScreenState extends State<SavingsScreen>
                     controller: targetController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Target Amount ($)',
+                      labelText: 'Target Amount (\$)',
                       hintText: 'e.g., 1000',
                     ),
                   ),
