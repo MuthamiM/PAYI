@@ -23,7 +23,9 @@ public static class SystemEndpoints
             environment = environment.EnvironmentName,
             startedAtUtc = runtimeMetadata.StartedAtUtc,
             uptimeSeconds = (long)(now - runtimeMetadata.StartedAtUtc).TotalSeconds,
-            serverTimeUtc = now
+            serverTimeUtc = now,
+            latestVersion = "1.1.0",
+            updateUrl = "https://github.com/MuthamiM/PAYI/releases/tag/v1.1.0-aws"
         });
     }
 }

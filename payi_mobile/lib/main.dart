@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
 
 import 'theme/theme.dart';
 import 'theme/colors.dart';
@@ -18,6 +20,9 @@ import 'screens/receive_money_screen.dart';
 import 'screens/transaction_details_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/international_transfer_screen.dart';
+import 'screens/savings_screen.dart';
+import 'screens/crypto_screen.dart';
+import 'screens/loans_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,8 +51,15 @@ class PayiApp extends StatelessWidget {
   }
 }
 
-class DashboardSaaSScreen extends StatelessWidget {
+class DashboardSaaSScreen extends StatefulWidget {
   const DashboardSaaSScreen({super.key});
+
+  @override
+  State<DashboardSaaSScreen> createState() => _DashboardSaaSScreenState();
+}
+
+class _DashboardSaaSScreenState extends State<DashboardSaaSScreen> {
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -343,14 +355,40 @@ class DashboardSaaSScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'QUICK ACTIONS',
-                            style: TextStyle(
-                              color: mutedColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'QUICK ACTIONS',
+                                style: TextStyle(
+                                  color: mutedColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isExpanded = !_isExpanded;
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  _isExpanded ? 'SHOW LESS' : 'SHOW MORE',
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -405,6 +443,101 @@ class DashboardSaaSScreen extends StatelessWidget {
                                 AppColors.sendGradient,
                               ),
                             ],
+                          ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                            child: _isExpanded
+                                ? Column(
+                                    children: [
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          _buildActionItem(
+                                            context,
+                                            Icons.savings_outlined,
+                                            'Savings',
+                                            const SavingsScreen(),
+                                            const LinearGradient(colors: [Color(0xFF00C9A7), Color(0xFF059669)]),
+                                          ),
+                                          _buildActionItem(
+                                            context,
+                                            Icons.currency_bitcoin_outlined,
+                                            'Crypto',
+                                            const CryptoScreen(),
+                                            const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+                                          ),
+                                          _buildActionItem(
+                                            context,
+                                            Icons.credit_card_outlined,
+                                            'Loans',
+                                            const LoansScreen(),
+                                            const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // Promotional Card
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (context) => const SavingsScreen()),
+                                          );
+                                        },
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            gradient: AppColors.heroCardGradient,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: isDark ? Colors.white.withAlpha(15) : AppColors.surfaceLightBorder,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(10),
+                                                decoration: BoxDecoration(
+                                                  color: primaryColor.withAlpha(26),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(Icons.percent, color: primaryColor, size: 20),
+                                              ),
+                                              const SizedBox(width: 14),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Earn up to 5.2% APY',
+                                                      style: TextStyle(
+                                                        color: theme.colorScheme.onSurface,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      'Grow your wealth with high-yield savings.',
+                                                      style: TextStyle(
+                                                        color: mutedColor,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Icon(Icons.arrow_forward_ios, size: 12, color: mutedColor),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
                           ),
                         ],
                       ),
@@ -582,7 +715,6 @@ class DashboardSaaSScreen extends StatelessWidget {
     Gradient gradient,
   ) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () {

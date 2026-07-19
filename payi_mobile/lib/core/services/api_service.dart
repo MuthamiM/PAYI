@@ -293,4 +293,19 @@ class ApiService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>?> checkSystemHealth() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/system/health'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ApiService checkSystemHealth Error: $e');
+      return null;
+    }
+  }
 }
