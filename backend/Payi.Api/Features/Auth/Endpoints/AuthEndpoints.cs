@@ -154,7 +154,7 @@ public static class AuthEndpoints
             Email = request.Email,
             PhoneNumber = request.PhoneNumber,
             Country = request.Country,
-            DefaultCurrency = "USD", 
+            DefaultCurrency = string.IsNullOrWhiteSpace(request.Country) ? "USD" : request.Country, 
             PasswordHash = passwordService.Hash(request.Password),
             CreatedAtUtc = DateTimeOffset.UtcNow
         };

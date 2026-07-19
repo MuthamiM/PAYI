@@ -56,9 +56,10 @@ class ApiService {
         body: jsonEncode({
           'email': email,
           'name': name,
-          'phone': phone,
+          'phoneNumber': phone,
+          'country': currency,
           'password': password,
-          'currency': currency,
+          'confirmPassword': password,
         }),
       ).timeout(const Duration(seconds: 20));
       if (response.statusCode == 201 || response.statusCode == 200) {
