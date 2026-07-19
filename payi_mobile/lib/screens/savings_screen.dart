@@ -309,12 +309,7 @@ class _SavingsScreenState extends State<SavingsScreen>
                 StaggeredSlideIn(
                   index: _savingsGoals.length + 1,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Create savings goal coming soon!')),
-                      );
-                    },
+                    onPressed: () => _showCreateGoalSheet(context),
                     icon: Icon(Icons.add_circle_outline, color: primaryColor),
                     label: const Text('Create New Goal'),
                     style: OutlinedButton.styleFrom(
@@ -335,6 +330,203 @@ class _SavingsScreenState extends State<SavingsScreen>
           ),
         ),
       ),
+    );
+  }
+
+  void _showCreateGoalSheet(BuildContext context) {
+    final nameController = TextEditingController();
+    final targetController = TextEditingController();
+    IconData selectedIcon = Icons.star_border_outlined;
+    Color selectedColor = AppColors.primaryTeal;
+
+    final icons = [
+      Icons.star_border_outlined,
+      Icons.home_outlined,
+      Icons.directions_car_outlined,
+      Icons.flight_takeoff_outlined,
+      Icons.shopping_bag_outlined,
+      Icons.school_outlined,
+    ];
+
+    final colors = [
+      AppColors.primaryTeal,
+      AppColors.accentViolet,
+      AppColors.accentGold,
+      Colors.pinkAccent,
+      Colors.blueAccent,
+      Colors.orangeAccent,
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final theme = Theme.of(context);
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: Colors.white.withAlpha(15)),
+              ),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                top: 24,
+                left: 24,
+                right: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withAlpha(40),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Create Savings Goal',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Goal Name',
+                      hintText: 'e.g., Down Payment, New Laptop',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: targetController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Target Amount ($)',
+                      hintText: 'e.g., 1000',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'CHOOSE ICON',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface.withAlpha(150),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: icons.map((icon) {
+                      final isSelected = selectedIcon == icon;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedIcon = icon),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primary.withAlpha(30)
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface.withAlpha(30),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(icon, color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'CHOOSE COLOR',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface.withAlpha(150),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: colors.map((color) {
+                      final isSelected = selectedColor == color;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedColor = color),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(color: theme.colorScheme.onSurface, width: 2.5)
+                                : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () {
+                      final name = nameController.text.trim();
+                      final target = double.tryParse(targetController.text) ?? 0.0;
+                      if (name.isEmpty || target <= 0.0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please enter a valid goal name and target.')),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        _savingsGoals.add({
+                          'name': name,
+                          'icon': selectedIcon,
+                          'target': target,
+                          'saved': 0.0,
+                          'color': selectedColor,
+                        });
+                        _progressController.reset();
+                        _progressController.forward();
+                      });
+
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Savings goal "$name" created!')),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text('Create Goal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
